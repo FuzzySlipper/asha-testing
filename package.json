@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Boundary-proof reference consumer for ASHA public engine surfaces; not a product repo.",
   "scripts": {
+    "camera:mover": "node scripts/run-camera-mover.mjs",
     "check:boundary": "node scripts/check-boundary.mjs",
     "ci": "npm test",
     "conformance": "node scripts/run-conformance.mjs",

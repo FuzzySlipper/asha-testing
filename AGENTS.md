@@ -42,4 +42,12 @@ For the conformance harness specifically:
 npm run conformance
 ```
 
+For the first-person camera mover boundary scenario:
+
+```bash
+npm run camera:mover
+```
+
+The camera mover scenario writes `harness/out/camera-mover/latest/index.json`. Until ASHA has a public camera input/pose/projection surface, it must record the missing-surface engine feature request instead of importing internals or faking movement evidence.
+
 The harness writes `harness/out/conformance/latest/index.json` and must keep any missing public operation as an explicit artifact gap rather than using internals.

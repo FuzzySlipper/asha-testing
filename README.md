@@ -46,6 +46,7 @@ Then run:
 ```bash
 npm test
 npm run conformance
+npm run camera:mover
 npm run check:boundary
 npm run ci
 ```
@@ -72,9 +73,28 @@ Explicit gaps in the artifact:
 - screenshot/headless render evidence remains pending task #2509, so this harness records public render-diff evidence instead;
 - consumer compatibility metadata remains pending task #2536.
 
+## Camera mover prototype
+
+`npm run camera:mover` runs the first first-person camera mover boundary scenario and writes `harness/out/camera-mover/latest/index.json`.
+
+Current strongest available slice:
+
+1. load the same minimal abstract world fixture used by the conformance harness;
+2. initialize `@asha/runtime-bridge` through the public mock facade;
+3. submit a generated contract-shaped command through `submitCommands`;
+4. record the intended first-person camera input sequence;
+5. inspect the public runtime bridge manifest for camera operations;
+6. record deterministic artifact metadata, boundary-check result, and the missing public camera surface feature request.
+
+Explicit gap:
+
+- public camera input/pose/projection surface is absent from the current Tier 1 contracts/runtime bridge; the artifact links Den doc `asha/first-person-camera-public-surface-request` and follow-up task #2561 instead of importing ASHA internals or fabricating movement evidence.
+
 ## Source-of-truth links
 
 - Den task: `asha#2537`
+- Camera mover task: `asha#2540`
+- Camera surface request: `asha/first-person-camera-public-surface-request` / `asha#2561`
 - Parent Den task: `asha#2533`
 - Tier 1 public surface design: `asha/engine-boundary-public-surfaces`
 - Engine posture: `asha/asha-in-house-engine-substrate`
