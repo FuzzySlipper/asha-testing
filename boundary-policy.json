@@ -1,0 +1,42 @@
+{
+  "$schema": "./schemas/boundary-policy.schema.json",
+  "typescript": {
+    "allowedPackages": ["@asha/contracts", "@asha/runtime-bridge"],
+    "unstableDemoPackages": ["@asha/renderer-three"],
+    "forbiddenPackages": [
+      "@asha/native-bridge",
+      "@asha/wasm-replay-bridge",
+      "@asha/app",
+      "@asha/electron-main",
+      "@asha/ui-dom",
+      "@asha/devtools",
+      "@asha/policy-core",
+      "@asha/policy-examples",
+      "@asha/script-host",
+      "@asha/catalog-examples"
+    ]
+  },
+  "rust": {
+    "allowedCrates": [],
+    "allowedAshaPaths": [],
+    "forbiddenPathFragments": [
+      "../asha/engine-rs/crates/foundation/",
+      "../asha/engine-rs/crates/state/",
+      "../asha/engine-rs/crates/sim/",
+      "../asha/engine-rs/crates/services/",
+      "../asha/engine-rs/crates/rules/",
+      "../asha/engine-rs/crates/render/",
+      "../asha/engine-rs/crates/bridge/native-bridge",
+      "../asha/engine-rs/crates/wasm/wasm-api",
+      "../asha/engine-rs/crates/tools/"
+    ]
+  },
+  "pathRules": {
+    "forbiddenFragments": [
+      "../asha/ts/packages/*/src/",
+      "../asha/engine-rs/crates/*/src/",
+      "ts/packages/contracts/src/generated"
+    ]
+  },
+  "remediation": "Use @asha/runtime-bridge or @asha/contracts through their public package exports. If the public facade cannot express the demo need, file an ASHA engine feature request or approved temporary adapter request instead of importing internals."
+}

@@ -6,6 +6,7 @@
   "description": "Boundary-proof reference consumer for ASHA public engine surfaces; not a product repo.",
   "scripts": {
     "check:boundary": "node scripts/check-boundary.mjs",
+    "ci": "npm test",
     "test": "node --test tests/*.test.mjs && npm run check:boundary"
   },
   "dependencies": {

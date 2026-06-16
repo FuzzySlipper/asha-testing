@@ -12,7 +12,9 @@ It is **not**:
 
 ## Current dependency boundary
 
-V1 is TypeScript/runtime-bridge first. The only ASHA package dependencies in this scaffold are:
+V1 is TypeScript/runtime-bridge first. The machine-readable source of truth for the current allow/deny list is `boundary-policy.json`; prose in this README and `AGENTS.md` must agree with that file.
+
+The only ASHA package dependencies in this scaffold are:
 
 - `@asha/contracts` via `file:../asha/ts/packages/contracts`
 - `@asha/runtime-bridge` via `file:../asha/ts/packages/runtime-bridge`
@@ -28,9 +30,10 @@ Prototype tests such as first-person camera movers belong here only when they us
 ```bash
 npm test
 npm run check:boundary
+npm run ci
 ```
 
-The current test command is intentionally scaffold-level. The full conformance harness is pending the downstream task that adds the load world → apply command → render/projection evidence → save artifact flow.
+`npm run ci` is also wired into `.github/workflows/boundary.yml`. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
 
 ## Source-of-truth links
 

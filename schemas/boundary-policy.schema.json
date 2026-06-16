@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "asha-demo boundary policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["typescript", "rust", "pathRules", "remediation"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "typescript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedPackages", "unstableDemoPackages", "forbiddenPackages"],
+      "properties": {
+        "allowedPackages": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^@asha/" },
+          "uniqueItems": true
+        },
+        "unstableDemoPackages": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^@asha/" },
+          "uniqueItems": true
+        },
+        "forbiddenPackages": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^@asha/" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "rust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedCrates", "allowedAshaPaths", "forbiddenPathFragments"],
+      "properties": {
+        "allowedCrates": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "allowedAshaPaths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "forbiddenPathFragments": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "pathRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forbiddenFragments"],
+      "properties": {
+        "forbiddenFragments": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "remediation": { "type": "string", "minLength": 1 }
+  }
+}

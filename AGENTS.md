@@ -2,12 +2,12 @@
 
 `asha-demo` is a boundary-proof and prototype-quarantine repo for ASHA. It is not a product/game repo.
 
-Allowed imports/calls:
+Allowed imports/calls (see `boundary-policy.json` for the machine-readable list):
 
 - `@asha/contracts`
 - `@asha/runtime-bridge`
 - approved ASHA CLI/tool commands documented by the current task
-- `@asha/renderer-three` only when a future task explicitly marks it as an unstable demo/render-evidence surface
+- `@asha/renderer-three` only when a future task explicitly marks it as an unstable demo/render-evidence surface and updates the boundary policy accordingly
 
 Forbidden:
 
@@ -20,3 +20,11 @@ Forbidden:
 - no demo/product nouns added to ASHA core to make a prototype pass.
 
 If the public ASHA surface cannot express the test, create an engine feature request or temporary adapter request. Do not tunnel through internals.
+
+Required local/pre-merge command:
+
+```bash
+npm run ci
+```
+
+This runs the scaffold tests and `scripts/check-boundary.mjs`, which reads `boundary-policy.json`.
