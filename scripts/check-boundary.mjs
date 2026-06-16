@@ -58,7 +58,7 @@ for (const root of scanRoots) {
   for (const file of walk(path.join(repoRoot, root))) {
     const rel = path.relative(repoRoot, file);
     const text = fs.readFileSync(file, 'utf8');
-    const importPattern = /(?:from\s+|import\s*\(|import\s+)["']([^"']+)["']/g;
+    const importPattern = /(?:from\s+|import\s*\(|import\s+|require\s*\()["']([^"']+)["']/g;
     for (const match of text.matchAll(importPattern)) {
       const spec = match[1];
       if (spec?.startsWith('@asha/') && !allowedAshaPackages.has(spec)) {
