@@ -24,7 +24,15 @@ If the public ASHA surface cannot express the test, create an engine feature req
 Required local/pre-merge command:
 
 ```bash
+cd ../asha/ts && pnpm install --frozen-lockfile
+cd ../../asha-demo && npm install
 npm run ci
 ```
 
-This runs the scaffold tests and `scripts/check-boundary.mjs`, which reads `boundary-policy.json`.
+For the conformance harness specifically:
+
+```bash
+npm run conformance
+```
+
+The harness writes `harness/out/conformance/latest/index.json` and must keep any missing public operation as an explicit artifact gap rather than using internals.

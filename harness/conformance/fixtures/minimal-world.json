@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": 1,
+  "sceneId": 1001,
+  "description": "Minimal abstract ASHA boundary conformance fixture; no product/domain vocabulary.",
+  "command": {
+    "op": "setVoxel",
+    "grid": 1,
+    "coord": { "x": 0, "y": 0, "z": 0 },
+    "value": { "kind": "solid", "material": 1 }
+  },
+  "step": { "tick": 1 },
+  "render": { "frameCursor": 0 }
+}

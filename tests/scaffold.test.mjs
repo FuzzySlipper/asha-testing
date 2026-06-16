@@ -147,7 +147,3 @@ test('boundary checker rejects forbidden Rust Cargo dependency subtable paths', 
     await rm(cargoToml, { force: true });
   }
 });
-
-test('full conformance harness is intentionally pending #2539', { skip: 'Task #2537 only creates the repo scaffold; #2539 owns load/apply/render/save conformance.' }, () => {
-  // Pending by design: no fake engine success in the scaffold task.
-});

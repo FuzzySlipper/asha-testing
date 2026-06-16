@@ -27,13 +27,43 @@ Prototype tests such as first-person camera movers belong here only when they us
 
 ## Commands
 
+For a fresh checkout, install the ASHA TypeScript workspace first so `@asha/runtime-bridge` can resolve its internal workspace-only transport wrapper while `asha-demo` itself still depends only on Tier 1 public packages:
+
+```bash
+cd ../asha/ts && pnpm install --frozen-lockfile
+cd ../../asha-demo && npm install
+```
+
+Then run:
+
 ```bash
 npm test
+npm run conformance
 npm run check:boundary
 npm run ci
 ```
 
-`npm run ci` is also wired into `.github/workflows/boundary.yml`. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
+`npm run ci` is also wired into `.github/workflows/boundary.yml`. The workflow checks out `asha` beside `asha-demo` so the local `file:../asha/...` public package dependencies resolve before running the conformance suite. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
+
+## Conformance harness
+
+`npm run conformance` runs the first public-boundary proof and writes `harness/out/conformance/latest/index.json`.
+
+Current strongest available slice:
+
+1. load `harness/conformance/fixtures/minimal-world.json`;
+2. initialize `@asha/runtime-bridge` through the public mock facade;
+3. load the abstract world fixture through `loadWorldBundle`;
+4. submit a generated contract-shaped command through `submitCommands`;
+5. step simulation and read public render-diff evidence;
+6. save current world summary;
+7. record deterministic artifact metadata including state hash, boundary-check result, and explicit gaps.
+
+Explicit gaps in the artifact:
+
+- native Rust authority path is recorded as unavailable/unwired and linked to follow-up task #2559 when the native addon is absent or `submitCommands` is not wired;
+- screenshot/headless render evidence remains pending task #2509, so this harness records public render-diff evidence instead;
+- consumer compatibility metadata remains pending task #2536.
 
 ## Source-of-truth links
 

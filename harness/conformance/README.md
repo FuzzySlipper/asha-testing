@@ -1,15 +1,37 @@
-# Conformance harness placeholder
+# Conformance harness
 
-Task #2537 only creates the separate reference-consumer scaffold. The first real harness is owned by ASHA task #2539.
+Task #2539 owns the first `asha-demo` public-boundary conformance harness.
 
-Expected future flow:
+Command:
 
-1. initialize runtime through `@asha/runtime-bridge`;
-2. load a world bundle / abstract fixture through the public load surface;
-3. submit a generated command batch from `@asha/contracts`;
-4. verify accepted/rejected typed results;
-5. read render diffs or projection evidence through the facade;
-6. save world/evidence through public save/export surfaces;
-7. emit artifact metadata with ASHA source revision, package versions, command sequence, results, evidence paths, and boundary-check result.
+```bash
+npm run conformance
+```
 
-Until #2539 lands, the scaffold test suite records this as an explicit skipped test rather than faking success.
+Artifact output:
+
+```text
+harness/out/conformance/latest/index.json
+```
+
+The harness intentionally uses only Tier 1 public packages:
+
+- `@asha/contracts`
+- `@asha/runtime-bridge`
+
+Current flow:
+
+1. read `harness/conformance/fixtures/minimal-world.json`;
+2. initialize a runtime through the public `@asha/runtime-bridge` mock facade;
+3. load an abstract world fixture through `loadWorldBundle`;
+4. submit a generated contract-shaped command through `submitCommands`;
+5. step simulation;
+6. read public render-diff evidence;
+7. save current world summary;
+8. write artifact metadata with deterministic state hash, boundary-check result, public imports, and explicit gaps.
+
+This is the strongest available proof without cheating through ASHA internals. The artifact records the remaining gaps instead of pretending the full future path exists:
+
+- native authority is unavailable or unwired when the native addon is absent or a native operation fail-closes; this is linked to follow-up task #2559;
+- screenshot/headless render evidence is pending task #2509;
+- consumer compatibility metadata is pending task #2536.

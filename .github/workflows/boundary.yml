@@ -9,9 +9,26 @@ jobs:
   boundary:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout asha-demo
+        uses: actions/checkout@v4
+        with:
+          path: asha-demo
+      - name: Checkout ASHA engine sibling for file dependencies
+        uses: actions/checkout@v4
+        with:
+          repository: FuzzySlipper/asha
+          path: asha
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run scaffold and boundary checks
+      - name: Install pnpm for ASHA workspace links
+        run: npm install -g pnpm
+      - name: Install ASHA TypeScript workspace dependencies
+        working-directory: asha/ts
+        run: pnpm install --frozen-lockfile
+      - name: Install asha-demo dependencies
+        working-directory: asha-demo
+        run: npm ci
+      - name: Run conformance and boundary checks
+        working-directory: asha-demo
         run: npm run ci
