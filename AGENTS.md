@@ -21,6 +21,13 @@ Forbidden:
 
 If the public ASHA surface cannot express the test, create an engine feature request or temporary adapter request. Do not tunnel through internals.
 
+## Missing public surface workflow
+
+1. Try the current public surface first (`@asha/contracts`, `@asha/runtime-bridge`, or an approved ASHA CLI/tool command).
+2. If blocked, fill out `docs/engine-feature-request-template.md` and post/link it in the ASHA Den project. The request must explain the consumer use case, attempted public interface, missing capability, proposed engine surface, authority/projection/contract effects, required evidence, lane guess, and why the request is engine-level rather than demo/product-specific.
+3. Use `docs/temporary-adapter-template.md` only when a planner/steward explicitly approves a short-lived adapter. The adapter must link the engine feature request, include approval and expiry, live only in this consumer repo, carry evidence for why it was needed, and include review/removal steps.
+4. Missing public surface is never permission to import ASHA internals, raw native/WASM transports, generated file paths, or arbitrary JSON/runtime tunnels.
+
 Required local/pre-merge command:
 
 ```bash

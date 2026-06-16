@@ -25,6 +25,13 @@ The only ASHA package dependencies in this scaffold are:
 
 Prototype tests such as first-person camera movers belong here only when they use public ASHA engine interfaces. If a prototype cannot be expressed through the public facade, file an ASHA engine feature request or temporary adapter request; do not tunnel through internals.
 
+Templates:
+
+- `docs/engine-feature-request-template.md` — use when a consumer needs a new ASHA public surface.
+- `docs/temporary-adapter-template.md` — use only after planner/steward approval for a short-lived quarantined adapter linked to an engine feature request.
+
+Temporary adapters must have approval, expiry, quarantine location, evidence, review, and removal steps. They must stay in the consumer repo and must not move into ASHA internals.
+
 ## Commands
 
 For a fresh checkout, install the ASHA TypeScript workspace first so `@asha/runtime-bridge` can resolve its internal workspace-only transport wrapper while `asha-demo` itself still depends only on Tier 1 public packages:
