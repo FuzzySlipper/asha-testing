@@ -11,6 +11,10 @@ const failures = [];
 const allowedAshaPackages = new Set(policy.typescript.allowedPackages ?? []);
 const unstableDemoPackages = new Set(policy.typescript.unstableDemoPackages ?? []);
 const forbiddenAshaPackages = new Set(policy.typescript.forbiddenPackages ?? []);
+const allowedAshaPackagePaths = new Set(
+  [...allowedAshaPackages].map((packageName) => `../asha/ts/packages/${packageName.replace('@asha/', '')}`),
+);
+const knownAshaPackageRoot = '../asha/ts/packages/';
 const allowedRustCrates = new Set(policy.rust.allowedCrates ?? []);
 const allowedAshaPaths = (policy.rust.allowedAshaPaths ?? []).map(normalizePath);
 const forbiddenRustPathFragments = (policy.rust.forbiddenPathFragments ?? []).map(normalizePath);
@@ -46,19 +50,50 @@ function isForbiddenAshaRustPath(spec) {
   return true;
 }
 
+function normalizeDependencySpec(spec) {
+  return normalizePath(String(spec)).replace(/^file:/, '');
+}
+
+function validateAshaPackageName(context, packageName) {
+  if (!packageName.startsWith('@asha/')) return;
+  if (allowedAshaPackages.has(packageName)) return;
+  if (unstableDemoPackages.has(packageName)) {
+    fail(`${context} targets unstable ASHA demo package ${packageName} without explicit task approval`);
+  } else if (forbiddenAshaPackages.has(packageName)) {
+    fail(`${context} targets forbidden ASHA package ${packageName}`);
+  } else {
+    fail(`${context} targets non-approved ASHA package ${packageName}`);
+  }
+}
+
+function validateDependencySpec(section, name, spec) {
+  if (typeof spec !== 'string') return;
+  const normalizedSpec = normalizeDependencySpec(spec);
+  const npmAliasMatch = spec.match(/^npm:(@asha\/[^@]+)(?:@.+)?$/);
+  if (npmAliasMatch) {
+    validateAshaPackageName(`${section}.${name} npm alias`, npmAliasMatch[1]);
+  }
+  if (normalizedSpec.includes(knownAshaPackageRoot)) {
+    const packageRoot = normalizedSpec.split(knownAshaPackageRoot, 2)[1]?.split(/[/?#]/, 1)[0];
+    const targetPath = `${knownAshaPackageRoot}${packageRoot ?? ''}`;
+    const targetPackage = packageRoot ? `@asha/${packageRoot}` : null;
+    if (!allowedAshaPackagePaths.has(targetPath)) {
+      fail(`${section}.${name} points at non-approved ASHA package root ${spec}`);
+    }
+    if (targetPackage) {
+      validateAshaPackageName(`${section}.${name} path dependency`, targetPackage);
+    }
+  }
+  if (/\.\.\/asha\/.+\/src\//.test(normalizedSpec)) {
+    fail(`${section}.${name} points at an ASHA source internals path: ${spec}`);
+  }
+}
+
 for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
   const deps = packageJson[section] ?? {};
   for (const [name, spec] of Object.entries(deps)) {
-    if (name.startsWith('@asha/') && !allowedAshaPackages.has(name)) {
-      if (unstableDemoPackages.has(name)) {
-        fail(`${section}.${name} is an unstable demo surface and is not approved for this task`);
-      } else {
-        fail(`${section}.${name} is not an approved asha-demo Tier 1 dependency`);
-      }
-    }
-    if (typeof spec === 'string' && /\.\.\/asha\/.+\/src\//.test(normalizePath(spec))) {
-      fail(`${section}.${name} points at an ASHA source internals path: ${spec}`);
-    }
+    validateAshaPackageName(`${section}.${name}`, name);
+    validateDependencySpec(section, name, spec);
   }
 }
 
@@ -127,12 +162,39 @@ for (const root of scanRoots) {
 function parseCargoDependencyEntries(tomlText) {
   const entries = [];
   let section = null;
+  let dependencySubtable = null;
+
+  function flushDependencySubtable() {
+    if (dependencySubtable) {
+      entries.push(dependencySubtable);
+      dependencySubtable = null;
+    }
+  }
+
   for (const rawLine of tomlText.split(/\r?\n/)) {
     const line = rawLine.replace(/#.*$/, '').trim();
     if (line.length === 0) continue;
     const sectionMatch = line.match(/^\[([^\]]+)\]$/);
     if (sectionMatch) {
+      flushDependencySubtable();
       section = sectionMatch[1];
+      const dependencySubtableMatch = section.match(/(?:^|\.)(dependencies|dev-dependencies|build-dependencies)\.([A-Za-z0-9_-]+)$/);
+      if (dependencySubtableMatch) {
+        dependencySubtable = {
+          crateName: dependencySubtableMatch[2],
+          value: '',
+          pathSpec: null,
+          section: dependencySubtableMatch[1],
+        };
+      }
+      continue;
+    }
+    if (dependencySubtable) {
+      const pathMatch = line.match(/^path\s*=\s*["']([^"']+)["']/);
+      if (pathMatch) {
+        dependencySubtable.pathSpec = pathMatch[1];
+        dependencySubtable.value = line;
+      }
       continue;
     }
     if (!section || !/(^|\.)(dependencies|dev-dependencies|build-dependencies)$/.test(section)) continue;
@@ -142,6 +204,7 @@ function parseCargoDependencyEntries(tomlText) {
     const pathMatch = value.match(/path\s*=\s*["']([^"']+)["']/);
     entries.push({ crateName, value, pathSpec: pathMatch?.[1] ?? null, section });
   }
+  flushDependencySubtable();
   return entries;
 }
 

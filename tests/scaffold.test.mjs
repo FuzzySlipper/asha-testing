@@ -67,6 +67,47 @@ test('boundary checker rejects forbidden ASHA package dependencies', async () =>
   }
 });
 
+test('boundary checker rejects ASHA package-root dependency aliases', async () => {
+  const packageJsonUrl = new URL('../package.json', import.meta.url);
+  const original = await readFile(packageJsonUrl, 'utf8');
+  try {
+    const mutated = JSON.parse(original);
+    mutated.dependencies['evil-native'] = 'file:../asha/ts/packages/native-bridge';
+    await writeFile(packageJsonUrl, `${JSON.stringify(mutated, null, 2)}\n`);
+    const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /evil-native/);
+    assert.match(result.stderr, /native-bridge/);
+    assert.match(result.stderr, /public facade/);
+  } finally {
+    await writeFile(packageJsonUrl, original);
+  }
+});
+
+test('boundary checker rejects npm alias specs for forbidden ASHA packages', async () => {
+  const packageJsonUrl = new URL('../package.json', import.meta.url);
+  const original = await readFile(packageJsonUrl, 'utf8');
+  const forbiddenPackage = '@asha/' + 'native-bridge';
+  try {
+    const mutated = JSON.parse(original);
+    mutated.dependencies['evil-native'] = `npm:${forbiddenPackage}@1.0.0`;
+    await writeFile(packageJsonUrl, `${JSON.stringify(mutated, null, 2)}\n`);
+    const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /evil-native/);
+    assert.match(result.stderr, new RegExp(forbiddenPackage));
+    assert.match(result.stderr, /public facade/);
+  } finally {
+    await writeFile(packageJsonUrl, original);
+  }
+});
+
 test('boundary checker rejects forbidden Rust Cargo path dependencies', async () => {
   const cargoToml = new URL('../Cargo.toml', import.meta.url);
   const forbiddenCrate = 'state-store';
@@ -74,6 +115,26 @@ test('boundary checker rejects forbidden Rust Cargo path dependencies', async ()
     await writeFile(
       cargoToml,
       `[package]\nname = "asha-demo-boundary-probe"\nversion = "0.0.0"\nedition = "2021"\n\n[dependencies]\n${forbiddenCrate} = { path = "../asha/engine-rs/crates/state/state-store" }\n`,
+    );
+    const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /state-store/);
+    assert.match(result.stderr, /public facade/);
+  } finally {
+    await rm(cargoToml, { force: true });
+  }
+});
+
+test('boundary checker rejects forbidden Rust Cargo dependency subtable paths', async () => {
+  const cargoToml = new URL('../Cargo.toml', import.meta.url);
+  const forbiddenCrate = 'state-store';
+  try {
+    await writeFile(
+      cargoToml,
+      `[package]\nname = "asha-demo-boundary-probe"\nversion = "0.0.0"\nedition = "2021"\n\n[dependencies.${forbiddenCrate}]\npath = "../asha/engine-rs/crates/state/state-store"\n`,
     );
     const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
       cwd: repoRoot,
