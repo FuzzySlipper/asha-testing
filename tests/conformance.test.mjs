@@ -18,8 +18,8 @@ test('public boundary conformance harness emits deterministic artifact metadata'
   assert.match(result.stdout, /wrote harness\/out\/conformance\/latest\/index\.json/);
 
   const artifact = JSON.parse(await readFile(artifactIndex, 'utf8'));
-  assert.equal(artifact.schemaVersion, 1);
-  assert.equal(artifact.runtime.mode, 'mock-public-facade');
+  assert.equal(artifact.schemaVersion, 2);
+  assert.equal(artifact.runtime.mode, 'mock-public-facade-with-native-probe');
   assert.equal(artifact.workflow.loadedWorld, 1001);
   assert.deepEqual(artifact.workflow.commandResult, {
     accepted: 1,
@@ -33,9 +33,20 @@ test('public boundary conformance harness emits deterministic artifact metadata'
   assert.equal(artifact.boundaryCheck.command, 'npm run check:boundary');
   assert.equal(artifact.boundaryCheck.status, 'passed');
   assert.deepEqual(artifact.publicImports, ['@asha/contracts', '@asha/runtime-bridge']);
+
+  assert.equal(artifact.compatibility.contracts.compatibilityVersion, 'contracts.v0');
+  assert.equal(artifact.compatibility.runtimeBridge.compatibilityVersion, 'runtime-bridge.v0');
+  assert.match(artifact.ashaSource.commit, /^[0-9a-f]{40}$/);
+  assert.match(artifact.repo.commit, /^[0-9a-f]{40}$/);
+
+  assert.equal(artifact.cameraEvidence.status, 'public-camera-surface-produced-projection-evidence');
+  assert.deepEqual(artifact.cameraEvidence.missingOperations, []);
+  assert.notDeepEqual(artifact.cameraEvidence.afterPose, artifact.cameraEvidence.beforePose);
+  assert.equal(artifact.cameraEvidence.projectionSnapshot.projectionHash, 'fnv1a64:071327a4920ab097');
+
   assert.equal(artifact.gaps.nativeAuthority.status, 'unavailable-or-unwired');
   assert.equal(artifact.gaps.nativeAuthority.followUpTask, 2559);
-  assert.equal(artifact.gaps.renderEvidence.status, 'public-render-diff-only');
-  assert.equal(artifact.gaps.renderEvidence.followUpTask, 2509);
-  assert.equal(artifact.gaps.compatibilityMetadata.followUpTask, 2536);
+  assert.ok(['available-inventory-only', 'captured', 'unavailable'].includes(artifact.renderEvidence.agora.status));
+  assert.equal(artifact.gaps.renderEvidence.followUpTask, 2553);
+  assert.ok(['comparable', 'unavailable'].includes(artifact.renderEvidence.comparison.status));
 });

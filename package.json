@@ -9,6 +9,7 @@
     "check:boundary": "node scripts/check-boundary.mjs",
     "ci": "npm test",
     "conformance": "node scripts/run-conformance.mjs",
+    "conformance:agora": "ASHA_DEMO_AGORA_EVIDENCE=live node scripts/run-conformance.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs && npm run check:boundary"
   },
   "dependencies": {
