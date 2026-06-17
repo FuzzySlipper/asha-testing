@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 
 import '@asha/contracts';
 import {
-  MANIFEST_OPERATIONS,
   RuntimeBridgeError,
   STABLE_OPERATION_COUNT,
   createMockRuntimeBridge,
@@ -417,7 +416,7 @@ const artifact = {
   gaps: {
     nativeAuthority: {
       ...nativeAuthority,
-      followUpTask: 2559,
+      followUpTask: 2570,
     },
     renderEvidence: {
       status: agoraEvidence.status === 'captured' ? 'agora-compositor-capture-available' : 'agora-compositor-capture-unavailable',
