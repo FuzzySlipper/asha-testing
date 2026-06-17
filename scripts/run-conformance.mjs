@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { inflateSync } from 'node:zlib';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -140,6 +141,154 @@ function latestArtifact(artifacts) {
   return [...artifacts].sort((a, b) => String(b.timestamp ?? '').localeCompare(String(a.timestamp ?? '')))[0];
 }
 
+function paeth(left, up, upperLeft) {
+  const p = left + up - upperLeft;
+  const pa = Math.abs(p - left);
+  const pb = Math.abs(p - up);
+  const pc = Math.abs(p - upperLeft);
+  if (pa <= pb && pa <= pc) return left;
+  if (pb <= pc) return up;
+  return upperLeft;
+}
+
+async function inspectPngVisualContent(imagePath) {
+  if (!imagePath) return { status: 'missing', classification: 'missing-image-path' };
+  let buffer;
+  try {
+    buffer = await readFile(imagePath);
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      classification: 'image-read-failed',
+      imagePath,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (buffer.length < signature.length || !buffer.subarray(0, signature.length).equals(signature)) {
+    return { status: 'invalid', classification: 'not-a-png', imagePath };
+  }
+
+  let offset = signature.length;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idat = [];
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.subarray(offset + 4, offset + 8).toString('ascii');
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (dataEnd + 4 > buffer.length) return { status: 'invalid', classification: 'truncated-png', imagePath };
+    const data = buffer.subarray(dataStart, dataEnd);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+    } else if (type === 'IDAT') {
+      idat.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+    offset = dataEnd + 4;
+  }
+
+  const channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[colorType];
+  if (bitDepth !== 8 || !channels || width <= 0 || height <= 0 || idat.length === 0) {
+    return {
+      status: 'unsupported',
+      classification: 'unsupported-png-shape',
+      imagePath,
+      width,
+      height,
+      bitDepth,
+      colorType,
+    };
+  }
+
+  let inflated;
+  try {
+    inflated = inflateSync(Buffer.concat(idat));
+  } catch (error) {
+    return {
+      status: 'invalid',
+      classification: 'png-inflate-failed',
+      imagePath,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const bytesPerPixel = channels;
+  const rowBytes = width * bytesPerPixel;
+  const expected = height * (rowBytes + 1);
+  if (inflated.length < expected) return { status: 'invalid', classification: 'truncated-png-raster', imagePath, width, height };
+
+  const mins = Array(channels).fill(255);
+  const maxes = Array(channels).fill(0);
+  const colors = new Set();
+  let cursor = 0;
+  let prior = Buffer.alloc(rowBytes);
+  for (let y = 0; y < height; y += 1) {
+    const filter = inflated[cursor];
+    cursor += 1;
+    const row = Buffer.alloc(rowBytes);
+    for (let x = 0; x < rowBytes; x += 1) {
+      const raw = inflated[cursor + x];
+      const left = x >= bytesPerPixel ? row[x - bytesPerPixel] : 0;
+      const up = prior[x];
+      const upperLeft = x >= bytesPerPixel ? prior[x - bytesPerPixel] : 0;
+      if (filter === 0) row[x] = raw;
+      else if (filter === 1) row[x] = (raw + left) & 0xff;
+      else if (filter === 2) row[x] = (raw + up) & 0xff;
+      else if (filter === 3) row[x] = (raw + Math.floor((left + up) / 2)) & 0xff;
+      else if (filter === 4) row[x] = (raw + paeth(left, up, upperLeft)) & 0xff;
+      else return { status: 'invalid', classification: 'unknown-png-filter', imagePath, width, height, filter };
+    }
+    cursor += rowBytes;
+    for (let x = 0; x < rowBytes; x += channels) {
+      const sample = [];
+      for (let channel = 0; channel < channels; channel += 1) {
+        const value = row[x + channel];
+        mins[channel] = Math.min(mins[channel], value);
+        maxes[channel] = Math.max(maxes[channel], value);
+        sample.push(value);
+      }
+      if (colors.size <= 16) colors.add(sample.join(','));
+    }
+    prior = row;
+  }
+
+  const alphaIndex = colorType === 4 ? 1 : colorType === 6 ? 3 : null;
+  const alphaVisible = alphaIndex === null || maxes[alphaIndex] > 0;
+  const colorChannels = alphaIndex === null ? channels : channels - 1;
+  const hasColorVariation = mins.slice(0, colorChannels).some((min, index) => min !== maxes[index]);
+  const hasNonZeroColor = maxes.slice(0, colorChannels).some((max) => max > 0);
+  const visible = alphaVisible && (hasColorVariation || hasNonZeroColor);
+
+  return {
+    status: visible ? 'visible' : 'blank',
+    classification: visible ? 'png-visible-content' : 'blank-or-transparent-png',
+    imagePath,
+    width,
+    height,
+    mode: colorType === 6 ? 'RGBA' : colorType === 2 ? 'RGB' : colorType === 4 ? 'grayscale-alpha' : 'grayscale',
+    extrema: mins.map((min, index) => [min, maxes[index]]),
+    uniqueColorsSampled: colors.size,
+    firstColors: [...colors].slice(0, 8),
+  };
+}
+
+async function artifactWithVisualInspection(artifact) {
+  if (!artifact) return null;
+  return {
+    ...artifact,
+    visualInspection: await inspectPngVisualContent(artifact.image_path),
+  };
+}
+
 async function writeAgoraProofPage(data) {
   await mkdir(agoraOutDir, { recursive: true });
   const html = `<!doctype html>
@@ -168,11 +317,12 @@ async function collectAgoraEvidence({ ashaSource, demoSource, projectionHash, st
   const listResult = run(compositorctl, ['--pretty', 'artifacts', 'list'], { timeout: 10000 });
   const artifactList = parseJsonResult(listResult);
   const artifacts = artifactList?.artifacts ?? [];
+  const latest = await artifactWithVisualInspection(latestArtifact(artifacts));
   const inventory = {
     command: listResult.command,
     status: listResult.status,
     artifactCount: artifacts.length,
-    latest: latestArtifact(artifacts),
+    latest,
     stderr: listResult.stderr,
   };
 
@@ -187,14 +337,24 @@ async function collectAgoraEvidence({ ashaSource, demoSource, projectionHash, st
   }
 
   if (agoraEvidenceMode !== 'live') {
+    const hasVisibleInventory = latest?.visualInspection?.status === 'visible';
+    const hasBlankInventory = latest?.visualInspection?.status === 'blank';
     return {
       ...base,
-      status: artifacts.length > 0 ? 'available-inventory-only' : 'unavailable',
-      classification: artifacts.length > 0 ? 'existing-compositor-artifact-inventory' : 'no-agora-artifacts-found',
+      status: hasVisibleInventory ? 'available-inventory-only' : 'unavailable',
+      classification: hasVisibleInventory
+        ? 'existing-compositor-artifact-inventory'
+        : hasBlankInventory
+          ? 'blank-compositor-capture-inventory'
+          : artifacts.length > 0
+            ? 'unvalidated-compositor-artifact-inventory'
+            : 'no-agora-artifacts-found',
       inventory,
       comparison: {
         status: 'unavailable',
-        reason: 'live ASHA surface capture was not requested; set ASHA_DEMO_AGORA_EVIDENCE=live to attempt app launch/capture',
+        reason: hasBlankInventory
+          ? 'latest Agora inventory artifact is a blank/transparent PNG, not usable visual evidence'
+          : 'live ASHA surface capture was not requested; set ASHA_DEMO_AGORA_EVIDENCE=live to attempt app launch/capture',
       },
     };
   }
@@ -300,18 +460,27 @@ async function collectAgoraEvidence({ ashaSource, demoSource, projectionHash, st
     `asha-demo-conformance:${projectionHash}`,
   ], { timeout: 10000 });
   const capture = parseJsonResult(captureResult);
+  const inspectedCapture = capture ? await artifactWithVisualInspection(capture) : null;
+  const captureVisible = inspectedCapture?.visualInspection?.status === 'visible';
+  const captureBlank = inspectedCapture?.visualInspection?.status === 'blank';
   return {
     ...base,
-    status: capture?.sha256 ? 'captured' : 'unavailable',
-    classification: capture?.sha256 ? 'agora-compositor-capture' : 'agora-capture-failed',
+    status: captureVisible ? 'captured' : 'unavailable',
+    classification: captureVisible
+      ? 'agora-compositor-capture'
+      : captureBlank
+        ? 'agora-capture-blank-readback'
+        : 'agora-capture-failed',
     inventory,
     session: { sessionId: session.session_id, label: session.label, artifactRoot: session.artifact_root },
     launch: { launchId: launch.launch_id, pid: launch.pid, surfaceId: surfaceID },
-    capture,
+    capture: inspectedCapture,
     captureAttempt: captureResult.status === 'passed' ? undefined : captureResult,
-    comparison: capture?.sha256
-      ? { status: 'comparable', reason: 'Agora compositor capture produced a PNG artifact for the ASHA evidence page; ASHA renderDiff remains public structural evidence.' }
-      : { status: 'unavailable', reason: 'Agora capture command failed' },
+    comparison: captureVisible
+      ? { status: 'comparable', reason: 'Agora compositor capture produced a non-blank PNG artifact for the ASHA evidence page; ASHA renderDiff remains public structural evidence.' }
+      : captureBlank
+        ? { status: 'unavailable', reason: 'Agora capture produced a blank/transparent PNG readback, not usable visual evidence' }
+        : { status: 'unavailable', reason: 'Agora capture command failed' },
   };
 }
 
@@ -371,6 +540,44 @@ const agoraEvidence = await collectAgoraEvidence({
   stateHashValue,
 });
 
+const unresolvedGaps = {};
+const resolvedEvidence = {};
+
+if (nativeAuthority.status === 'available') {
+  resolvedEvidence.nativeAuthority = {
+    ...nativeAuthority,
+    resolvedByTask: 2570,
+  };
+} else {
+  unresolvedGaps.nativeAuthority = {
+    ...nativeAuthority,
+    followUpTask: 2570,
+  };
+}
+
+const hasBlankAgoraReadback = agoraEvidence.classification === 'blank-compositor-capture-inventory'
+  || agoraEvidence.classification === 'agora-capture-blank-readback'
+  || agoraEvidence.inventory?.latest?.visualInspection?.status === 'blank'
+  || agoraEvidence.capture?.visualInspection?.status === 'blank';
+
+if (agoraEvidence.status === 'captured') {
+  resolvedEvidence.renderEvidence = {
+    status: 'agora-compositor-capture-available',
+    resolvedByTask: 2553,
+    detail: agoraEvidence.comparison.reason,
+  };
+} else {
+  unresolvedGaps.renderEvidence = {
+    status: hasBlankAgoraReadback
+      ? 'agora-compositor-capture-blank-readback'
+      : 'agora-compositor-capture-unavailable',
+    followUpTask: 2553,
+    detail: hasBlankAgoraReadback
+      ? `${agoraEvidence.comparison.reason}; latest Agora inventory PNG is blank/transparent and not usable visual evidence`
+      : agoraEvidence.comparison.reason,
+  };
+}
+
 const artifact = {
   schemaVersion: 2,
   generatedAt: 'deterministic-as-structure-only',
@@ -413,17 +620,8 @@ const artifact = {
     stateHash: stateHashValue,
   },
   boundaryCheck,
-  gaps: {
-    nativeAuthority: {
-      ...nativeAuthority,
-      followUpTask: 2570,
-    },
-    renderEvidence: {
-      status: agoraEvidence.status === 'captured' ? 'agora-compositor-capture-available' : 'agora-compositor-capture-unavailable',
-      followUpTask: 2553,
-      detail: agoraEvidence.comparison.reason,
-    },
-  },
+  resolvedEvidence,
+  gaps: unresolvedGaps,
 };
 
 await mkdir(outDir, { recursive: true });
