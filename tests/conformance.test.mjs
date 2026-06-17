@@ -49,7 +49,12 @@ test('public boundary conformance harness emits deterministic artifact metadata'
   assert.equal(artifact.gaps.nativeAuthority, undefined);
   assert.equal(artifact.runtime.nativeMode, 'native-public-facade');
   assert.ok(['available-inventory-only', 'captured', 'unavailable'].includes(artifact.renderEvidence.agora.status));
-  assert.equal(artifact.gaps.renderEvidence.followUpTask, 2553);
+  if (artifact.renderEvidence.agora.status === 'captured') {
+    assert.equal(artifact.resolvedEvidence.renderEvidence.resolvedByTask, 2553);
+    assert.equal(artifact.gaps.renderEvidence, undefined);
+  } else {
+    assert.equal(artifact.gaps.renderEvidence.followUpTask, 2553);
+  }
   if (artifact.renderEvidence.agora.inventory.latest?.visualInspection?.status === 'blank') {
     assert.equal(artifact.renderEvidence.agora.classification, 'blank-compositor-capture-inventory');
     assert.equal(artifact.gaps.renderEvidence.status, 'agora-compositor-capture-blank-readback');
