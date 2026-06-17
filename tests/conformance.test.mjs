@@ -44,8 +44,9 @@ test('public boundary conformance harness emits deterministic artifact metadata'
   assert.notDeepEqual(artifact.cameraEvidence.afterPose, artifact.cameraEvidence.beforePose);
   assert.equal(artifact.cameraEvidence.projectionSnapshot.projectionHash, 'fnv1a64:071327a4920ab097');
 
-  assert.equal(artifact.gaps.nativeAuthority.status, 'unavailable-or-unwired');
+  assert.equal(artifact.gaps.nativeAuthority.status, 'available');
   assert.equal(artifact.gaps.nativeAuthority.followUpTask, 2570);
+  assert.equal(artifact.runtime.nativeMode, 'native-public-facade');
   assert.ok(['available-inventory-only', 'captured', 'unavailable'].includes(artifact.renderEvidence.agora.status));
   assert.equal(artifact.gaps.renderEvidence.followUpTask, 2553);
   assert.ok(['comparable', 'unavailable'].includes(artifact.renderEvidence.comparison.status));
