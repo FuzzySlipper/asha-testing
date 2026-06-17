@@ -16,6 +16,8 @@ import {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturePath = path.join(repoRoot, 'harness/conformance/fixtures/minimal-world.json');
+const contractsCompatibilityPath = path.join(repoRoot, 'node_modules/@asha/contracts/compatibility.json');
+const runtimeCompatibilityPath = path.join(repoRoot, 'node_modules/@asha/runtime-bridge/compatibility.json');
 const outDir = path.join(repoRoot, 'harness/out/camera-mover/latest');
 const artifactPath = path.join(outDir, 'index.json');
 
@@ -24,6 +26,22 @@ const requiredCameraOperations = [
   'applyFirstPersonCameraInput',
   'readCameraProjection',
 ];
+
+const cameraScenario = {
+  initialPose: { position: [0, 1.6, 0], yawDegrees: 0, pitchDegrees: 0 },
+  projection: { fovYDegrees: 60, near: 0.1, far: 1000 },
+  viewport: { width: 1280, height: 720 },
+  input: {
+    moveForward: 1,
+    moveRight: 0,
+    moveUp: 0,
+    yawDeltaDegrees: 15,
+    pitchDeltaDegrees: -5,
+    dtSeconds: 1 / 60,
+    moveSpeedUnitsPerSecond: 3,
+  },
+  tick: 1,
+};
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
@@ -56,7 +74,20 @@ function missingCameraOperations() {
   return requiredCameraOperations.filter((operation) => !facadeMethods.has(operation));
 }
 
+async function readCompatibility(filePath) {
+  const metadata = JSON.parse(await readFile(filePath, 'utf8'));
+  return {
+    surface: metadata.surface,
+    compatibilityVersion: metadata.compatibilityVersion,
+    packageVersion: metadata.packageVersion,
+  };
+}
+
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
+const compatibility = {
+  contracts: await readCompatibility(contractsCompatibilityPath),
+  runtimeBridge: await readCompatibility(runtimeCompatibilityPath),
+};
 const bridge = createMockRuntimeBridge();
 const engineHandle = bridge.initializeEngine({ seed: fixture.sceneId });
 const composition = bridge.loadWorldBundle({
@@ -66,15 +97,28 @@ const composition = bridge.loadWorldBundle({
 });
 assert.equal(composition.blocksLoad, false);
 
-// The current public runtime facade has no camera operation. We still run the
-// strongest available public flow so the artifact proves the boundary remained
-// intact while recording the missing engine surface honestly.
+const missingOperations = missingCameraOperations();
+assert.deepEqual(missingOperations, []);
+
 const commandResult = bridge.submitCommands({ commands: [fixture.command] });
 const stepResult = bridge.stepSimulation(fixture.step);
+const beforeCamera = bridge.createCamera({
+  initialPose: cameraScenario.initialPose,
+  projection: cameraScenario.projection,
+  viewport: cameraScenario.viewport,
+});
+const afterCamera = bridge.applyFirstPersonCameraInput({
+  camera: beforeCamera.camera,
+  tick: cameraScenario.tick,
+  input: cameraScenario.input,
+});
+const projectionSnapshot = bridge.readCameraProjection({ camera: afterCamera.camera, viewport: null });
 const renderDiff = bridge.readRenderDiffs(frameCursor(fixture.render.frameCursor));
 const finalStatus = bridge.getCompositionStatus();
 const boundaryCheck = runBoundaryCheck();
 assert.equal(boundaryCheck.status, 'passed', `${boundaryCheck.stdout}\n${boundaryCheck.stderr}`);
+assert.notDeepEqual(afterCamera.pose, beforeCamera.pose);
+assert.match(projectionSnapshot.projectionHash, /^fnv1a64:[0-9a-f]{16}$/);
 
 const commandSequence = [
   {
@@ -92,17 +136,35 @@ const commandSequence = [
   },
   {
     order: 3,
-    kind: 'desiredFirstPersonCameraInput',
-    publicSurface: 'missing',
+    kind: 'createCamera',
+    publicSurface: '@asha/runtime-bridge',
     input: {
-      move: { forward: 1, right: 0, up: 0 },
-      look: { yawDeltaDegrees: 15, pitchDeltaDegrees: -5 },
-      dtSeconds: 0.016666667,
+      initialPose: cameraScenario.initialPose,
+      projection: cameraScenario.projection,
+      viewport: cameraScenario.viewport,
     },
-    result: 'not-submitted-no-public-camera-operation',
+    result: beforeCamera,
   },
   {
     order: 4,
+    kind: 'applyFirstPersonCameraInput',
+    publicSurface: '@asha/runtime-bridge',
+    input: { camera: beforeCamera.camera, tick: cameraScenario.tick, input: cameraScenario.input },
+    result: afterCamera,
+  },
+  {
+    order: 5,
+    kind: 'readCameraProjection',
+    publicSurface: '@asha/runtime-bridge',
+    input: { camera: afterCamera.camera, viewport: null },
+    result: {
+      camera: projectionSnapshot.camera,
+      tick: projectionSnapshot.tick,
+      projectionHash: projectionSnapshot.projectionHash,
+    },
+  },
+  {
+    order: 6,
     kind: 'readRenderDiffs',
     publicSurface: '@asha/runtime-bridge',
     frameCursor: fixture.render.frameCursor,
@@ -111,25 +173,25 @@ const commandSequence = [
 ];
 
 const cameraEvidence = {
-  status: 'blocked-by-missing-public-camera-surface',
-  attemptedPublicSurface: '@asha/runtime-bridge MANIFEST_OPERATIONS',
+  status: 'public-camera-surface-produced-projection-evidence',
+  publicSurface: '@asha/runtime-bridge',
+  runtimeMode: 'mock-public-facade-deterministic-reference',
   availableStableOperations: MANIFEST_OPERATIONS
     .filter((operation) => operation.surface === 'stable')
     .map((operation) => operation.facadeMethod),
-  missingOperations: missingCameraOperations(),
-  detail:
-    'The first-person camera input is recorded as an intended command sequence but not submitted, because the current public contracts/runtime facade expose no camera input/pose/projection operation.',
-  engineFeatureRequest: {
-    project: 'asha',
-    slug: 'first-person-camera-public-surface-request',
-    taskId: 2561,
-  },
+  missingOperations,
+  inputSequence: cameraScenario,
+  beforePose: beforeCamera.pose,
+  afterPose: afterCamera.pose,
+  beforeSnapshot: beforeCamera,
+  afterSnapshot: afterCamera,
+  projectionSnapshot,
 };
-assert.deepEqual(cameraEvidence.missingOperations, requiredCameraOperations);
 
 const workflowEvidence = {
   engineHandle,
   fixture,
+  compatibility,
   composition,
   commandSequence,
   stepResult,
@@ -143,16 +205,24 @@ const artifact = {
   scenario: {
     name: 'first-person-camera-mover-public-surface-prototype',
     task: 2540,
+    followUpTask: 2566,
     description:
-      'Attempts a first-person camera mover scenario from asha-demo using only public ASHA surfaces; records an engine feature request when the camera surface is absent.',
+      'Runs a first-person camera mover scenario from asha-demo using only public ASHA contracts/runtime bridge surfaces and records deterministic movement/projection evidence.',
   },
   repo: {
     name: 'asha-demo',
     path: repoRoot,
   },
+  ashaSource: {
+    path: path.resolve(repoRoot, '../asha'),
+    branch: 'task/2565-camera-reference-goldens',
+    commit: 'c32ae3d43791aeea819370779dbe14efff4451e0',
+  },
+  compatibility,
   publicImports: ['@asha/contracts', '@asha/runtime-bridge'],
   runtime: {
-    mode: 'mock-public-facade',
+    mode: 'mock-public-facade-deterministic-reference',
+    nativeMode: 'not-used',
     stableOperationCount: STABLE_OPERATION_COUNT,
   },
   workflow: {
