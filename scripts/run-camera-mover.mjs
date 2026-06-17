@@ -69,6 +69,21 @@ function runBoundaryCheck() {
   };
 }
 
+function gitOutput(cwd, args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(result.status, 0, `git ${args.join(' ')} failed: ${result.stderr}`);
+  return result.stdout.trim();
+}
+
+function readAshaSource() {
+  const ashaPath = path.resolve(repoRoot, '../asha');
+  return {
+    path: ashaPath,
+    branch: gitOutput(ashaPath, ['branch', '--show-current']),
+    commit: gitOutput(ashaPath, ['rev-parse', 'HEAD']),
+  };
+}
+
 function missingCameraOperations() {
   const facadeMethods = new Set(MANIFEST_OPERATIONS.map((operation) => operation.facadeMethod));
   return requiredCameraOperations.filter((operation) => !facadeMethods.has(operation));
@@ -84,6 +99,7 @@ async function readCompatibility(filePath) {
 }
 
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
+const ashaSource = readAshaSource();
 const compatibility = {
   contracts: await readCompatibility(contractsCompatibilityPath),
   runtimeBridge: await readCompatibility(runtimeCompatibilityPath),
@@ -213,11 +229,7 @@ const artifact = {
     name: 'asha-demo',
     path: repoRoot,
   },
-  ashaSource: {
-    path: path.resolve(repoRoot, '../asha'),
-    branch: 'task/2565-camera-reference-goldens',
-    commit: 'c32ae3d43791aeea819370779dbe14efff4451e0',
-  },
+  ashaSource,
   compatibility,
   publicImports: ['@asha/contracts', '@asha/runtime-bridge'],
   runtime: {
