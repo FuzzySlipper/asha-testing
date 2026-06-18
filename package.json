@@ -7,6 +7,7 @@
   "scripts": {
     "camera:mover": "node scripts/run-camera-mover.mjs",
     "camera:agora-control": "node scripts/run-camera-agora-control.mjs",
+    "voxel:interaction": "node scripts/run-voxel-interaction.mjs",
     "check:boundary": "node scripts/check-boundary.mjs",
     "ci": "npm test",
     "conformance": "node scripts/run-conformance.mjs",
