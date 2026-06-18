@@ -151,6 +151,18 @@ function paeth(left, up, upperLeft) {
   return upperLeft;
 }
 
+function alphaIndexForChannels(colorType) {
+  return colorType === 4 ? 1 : colorType === 6 ? 3 : null;
+}
+
+function colorChannelsForType(colorType) {
+  return colorType === 0 || colorType === 4 ? 1 : 3;
+}
+
+function ratio(count, total) {
+  return total > 0 ? Number((count / total).toFixed(4)) : 0;
+}
+
 async function inspectPngVisualContent(imagePath) {
   if (!imagePath) return { status: 'missing', classification: 'missing-image-path' };
   let buffer;
@@ -229,6 +241,9 @@ async function inspectPngVisualContent(imagePath) {
   const mins = Array(channels).fill(255);
   const maxes = Array(channels).fill(0);
   const colors = new Set();
+  let opaquePixels = 0;
+  let darkOpaquePixels = 0;
+  let lightOpaquePixels = 0;
   let cursor = 0;
   let prior = Buffer.alloc(rowBytes);
   for (let y = 0; y < height; y += 1) {
@@ -257,6 +272,15 @@ async function inspectPngVisualContent(imagePath) {
         sample.push(value);
       }
       if (colors.size <= 16) colors.add(sample.join(','));
+      const alpha = alphaIndexForChannels(colorType) === null ? 255 : sample[alphaIndexForChannels(colorType)];
+      const r = sample[0];
+      const g = colorChannelsForType(colorType) >= 3 ? sample[1] : sample[0];
+      const b = colorChannelsForType(colorType) >= 3 ? sample[2] : sample[0];
+      if (alpha >= 240) {
+        opaquePixels += 1;
+        if (r < 48 && g < 64 && b < 96) darkOpaquePixels += 1;
+        if (r > 230 && g > 230 && b > 220) lightOpaquePixels += 1;
+      }
     }
     prior = row;
   }
@@ -277,6 +301,9 @@ async function inspectPngVisualContent(imagePath) {
     mode: colorType === 6 ? 'RGBA' : colorType === 2 ? 'RGB' : colorType === 4 ? 'grayscale-alpha' : 'grayscale',
     extrema: mins.map((min, index) => [min, maxes[index]]),
     uniqueColorsSampled: colors.size,
+    opaquePixelRatio: ratio(opaquePixels, width * height),
+    darkOpaquePixelRatio: ratio(darkOpaquePixels, width * height),
+    lightOpaquePixelRatio: ratio(lightOpaquePixels, width * height),
     firstColors: [...colors].slice(0, 8),
   };
 }

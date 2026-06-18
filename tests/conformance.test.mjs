@@ -56,8 +56,12 @@ test('public boundary conformance harness emits deterministic artifact metadata'
     assert.equal(artifact.gaps.renderEvidence.followUpTask, 2553);
   }
   if (artifact.renderEvidence.agora.inventory.latest?.visualInspection?.status === 'blank') {
+    const visualInspection = artifact.renderEvidence.agora.inventory.latest.visualInspection;
     assert.equal(artifact.renderEvidence.agora.classification, 'blank-compositor-capture-inventory');
     assert.equal(artifact.gaps.renderEvidence.status, 'agora-compositor-capture-blank-readback');
+    assert.equal(typeof visualInspection.opaquePixelRatio, 'number');
+    assert.equal(typeof visualInspection.darkOpaquePixelRatio, 'number');
+    assert.equal(typeof visualInspection.lightOpaquePixelRatio, 'number');
   }
   assert.ok(['comparable', 'unavailable'].includes(artifact.renderEvidence.comparison.status));
 });
