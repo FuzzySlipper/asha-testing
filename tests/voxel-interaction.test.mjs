@@ -77,7 +77,25 @@ test('basic graphical voxel interaction scene records public ASHA evidence and l
   assert.match(page, /window\.ashaVoxelInteraction/);
   assert.match(page, /data-proof-ready="true"/);
   assert.match(page, /data-command="applySelectionEdit"/);
-  assert.match(page, /selected terrain voxel/);
+  assert.match(page, /selected terrain voxel before edit/);
+  assert.match(page, /<pre id="proofSummary"><\/pre>/);
+  assert.doesNotMatch(page, /<pre>\{\n  "renderChanged": true,/);
+  assert.doesNotMatch(page, /<div class="voxel added"/);
+  assert.match(page, /function ensureEditedVoxel\(\)/);
+  assert.match(page, /document\.createElement\('div'\)/);
+  assert.match(page, /document\.body\.dataset\.renderChanged = String\(editApplied && pageState\.render\.changed\)/);
+  assert.match(page, /document\.body\.dataset\.postInputRenderChanged = String\(editApplied && pageState\.render\.changed\)/);
+  assert.match(page, /applySelectionEdit\(\) \{\n    editApplied = true;\n    ensureEditedVoxel\(\);/);
+
+  assert.deepEqual(artifact.renderEvidencePolicy.capture.readinessMarkers, [
+    'body[data-ready="true"]',
+    'main[data-proof-ready="true"]',
+    'body[data-edit-applied="false"]',
+  ]);
+  assert.deepEqual(artifact.renderEvidencePolicy.capture.postInputMarkers, [
+    'body[data-edit-applied="true"]',
+    'body[data-post-input-render-changed="true"]',
+  ]);
 
   assert.equal(artifact.boundaryCheck.status, 'passed');
   assert.equal(artifact.renderEvidencePolicy.evidenceClass, 'functional_software_visual');

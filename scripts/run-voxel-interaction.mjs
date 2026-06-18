@@ -143,6 +143,7 @@ function renderInteractionPage({ artifact }) {
     edit: artifact.edit.command,
     mesh: artifact.mesh,
     render: artifact.render,
+    boundaryStatus: artifact.boundaryCheck.status,
     declaredInputs: artifact.controlSurface.declaredInputs,
   };
   const pageJson = JSON.stringify(pageState).replaceAll('</', '<\\/');
@@ -164,6 +165,8 @@ function renderInteractionPage({ artifact }) {
   .terrain { background: #64748b; }
   .selected { outline: 4px solid #fbbf24; z-index: 2; }
   .added { background: #22c55e; left: 50%; top: 31%; z-index: 3; animation: pulse 1.6s infinite; }
+  body[data-edit-applied="false"] .selected { outline-color: #fbbf24; }
+  body[data-edit-applied="true"] .selected { outline-color: #38bdf8; }
   #crosshair { position: absolute; left: 50%; top: 50%; width: 32px; height: 32px; margin-left: -16px; margin-top: -16px; border: 2px solid #fbbf24; border-radius: 999px; box-shadow: 0 0 18px #fbbf24; }
   #proof { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #020617; padding: 12px; border: 1px solid #1e293b; border-radius: 10px; }
@@ -174,27 +177,44 @@ function renderInteractionPage({ artifact }) {
   <h1>ASHA Basic Voxel Interaction</h1>
   <p>Scenario: <code>${scenarioId}</code>. Fixture: <code>${artifact.fixture.fixtureId}</code>. Crosshair selects voxel <code>${JSON.stringify(selected)}</code>; edit anchor <code>${JSON.stringify(anchor)}</code>.</p>
   <div id="viewport" aria-label="ASHA voxel interaction proof viewport">
-    <div class="voxel terrain selected" style="left: calc(50% - 27px); top: calc(55% - 27px);" aria-label="selected terrain voxel"></div>
+    <div class="voxel terrain selected" style="left: calc(50% - 27px); top: calc(55% - 27px);" aria-label="selected terrain voxel before edit"></div>
     <div class="voxel terrain" style="left: calc(50% - 90px); top: calc(63% - 27px);"></div>
     <div class="voxel terrain" style="left: calc(50% + 36px); top: calc(63% - 27px);"></div>
-    <div class="voxel added" aria-label="edited voxel added at selection anchor"></div>
     <div id="crosshair" aria-label="fixed crosshair selection point"></div>
   </div>
   <button type="button" data-command="applySelectionEdit">applySelectionEdit</button>
   <div id="proof">
     <pre id="state"></pre>
-    <pre>${JSON.stringify({ renderChanged: artifact.render.changed, meshChanged: artifact.mesh.changed, boundary: artifact.boundaryCheck.status }, null, 2)}</pre>
+    <pre id="proofSummary"></pre>
   </div>
 </main>
 <script>
 const pageState = ${pageJson};
 let editApplied = false;
+function ensureEditedVoxel() {
+  const viewport = document.getElementById('viewport');
+  let editedVoxel = document.getElementById('editedVoxel');
+  if (editedVoxel) return editedVoxel;
+  editedVoxel = document.createElement('div');
+  editedVoxel.id = 'editedVoxel';
+  editedVoxel.className = 'voxel added';
+  editedVoxel.setAttribute('aria-label', 'edited voxel added at selection anchor after input');
+  viewport.appendChild(editedVoxel);
+  return editedVoxel;
+}
 function render() {
   document.body.dataset.ready = 'true';
   document.body.dataset.editApplied = String(editApplied);
   document.body.dataset.scenario = pageState.scenarioId;
   document.body.dataset.selectionHash = pageState.selection.selectionHash;
-  document.body.dataset.renderChanged = String(pageState.render.changed);
+  document.body.dataset.renderChanged = String(editApplied && pageState.render.changed);
+  document.body.dataset.postInputRenderChanged = String(editApplied && pageState.render.changed);
+  document.getElementById('proofSummary').textContent = JSON.stringify({
+    renderChanged: editApplied && pageState.render.changed,
+    meshChanged: editApplied && pageState.mesh.changed,
+    boundary: pageState.boundaryStatus,
+    phase: editApplied ? 'after-input-edit-applied' : 'before-input-awaiting-edit',
+  }, null, 2);
   document.getElementById('state').textContent = JSON.stringify({
     scenarioId: pageState.scenarioId,
     camera: pageState.camera,
@@ -213,6 +233,7 @@ window.ashaVoxelInteraction = {
   declaredInputs: pageState.declaredInputs,
   applySelectionEdit() {
     editApplied = true;
+    ensureEditedVoxel();
     render();
     return { accepted: true, selectedVoxel: pageState.selection.selectedVoxel, editAnchor: pageState.selection.editAnchor };
   },
@@ -375,7 +396,8 @@ const artifact = {
     capture: {
       nonblankRequired: true,
       proofContentRequired: true,
-      readinessMarkers: ['body[data-ready="true"]', 'main[data-proof-ready="true"]', 'body[data-render-changed="true"]'],
+      readinessMarkers: ['body[data-ready="true"]', 'main[data-proof-ready="true"]', 'body[data-edit-applied="false"]'],
+      postInputMarkers: ['body[data-edit-applied="true"]', 'body[data-post-input-render-changed="true"]'],
     },
   },
   agoraSlots: {
