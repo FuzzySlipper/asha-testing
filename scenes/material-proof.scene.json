@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "sceneId": 1002,
+  "name": "ASHA Demo Material Proof",
+  "description": "Proof scene that references mesh, material, and texture catalog assets together.",
+  "catalogAssetIds": ["mesh.demo-cube", "material.demo-copper", "texture.demo-checker"],
+  "runtimeFixture": "harness/conformance/fixtures/minimal-world.json"
+}

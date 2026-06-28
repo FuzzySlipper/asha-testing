@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import {
   ASHA_DEVTOOLS_PROTOCOL_VERSION,
@@ -47,6 +47,20 @@ const manifest = parseAshaGameManifestToml(manifestText);
 assert.equal(manifest.ok, true, manifest.ok ? '' : JSON.stringify(manifest.diagnostics));
 const fixture = JSON.parse(readFileSync(join(repoRoot, manifest.manifest.runtime.wasmOrNativeEntry), 'utf8'));
 const scene = JSON.parse(readFileSync(join(repoRoot, 'scenes/minimal.scene.json'), 'utf8'));
+const proofScenes = manifest.manifest.workspace.sceneRoots.flatMap((root) =>
+  readdirSync(join(repoRoot, root))
+    .filter((name) => name.endsWith('.scene.json'))
+    .sort()
+    .map((name) => {
+      const proofScene = JSON.parse(readFileSync(join(repoRoot, root, name), 'utf8'));
+      return {
+        path: `${root}/${name}`,
+        sceneId: proofScene.sceneId,
+        name: proofScene.name,
+        catalogAssetIds: proofScene.catalogAssetIds,
+      };
+    }),
+);
 const catalog = JSON.parse(readFileSync(join(repoRoot, 'packages/game-catalogs/catalog.json'), 'utf8'));
 const catalogValidation = validateAshaGameAssetCatalog(
   catalog,
@@ -57,6 +71,8 @@ assert.equal(catalogValidation.ok, true, catalogValidation.ok ? '' : JSON.string
 
 const assetResolutions = scene.catalogAssetIds.map((assetId) => resolveAshaGameAssetForDev(catalogValidation.catalog, assetId));
 assert.equal(assetResolutions.every((resolution) => resolution !== null), true);
+const catalogIds = new Set(catalogValidation.catalog.entries.map((entry) => entry.id));
+assert.equal(proofScenes.every((proofScene) => proofScene.catalogAssetIds.every((assetId) => catalogIds.has(assetId))), true);
 
 const launcher = createReferenceGameRuntimeLauncher();
 const runtimeSession = await launcher.launch({
@@ -254,6 +270,7 @@ console.log(JSON.stringify({
   status: 'listening',
   endpoint,
   scene: { sceneId: scene.sceneId, name: scene.name, catalogAssetIds: scene.catalogAssetIds },
+  proofScenes,
   loadedWorld: runtimeSession.launch.projection.loadedWorld,
   runtimeMode: runtimeSession.identity.runtimeMode,
   launcherName: runtimeSession.launch.runtimeProfile.launcherName,

@@ -6,6 +6,11 @@
       "kind": "static_mesh",
       "source": "assets/meshes/demo-cube.mesh.json",
       "importProfile": "inline-static-mesh.v0",
+      "importMetadata": {
+        "sourceHash": "sha256:22b58100010034f72eb504d7722aec14b819438bce47e80bf361b3444e238117",
+        "cacheKey": "dev-cache/static_mesh/mesh.demo-cube/22b581000100",
+        "generatedArtifactVersion": "asset-import.v1"
+      },
       "dependencies": ["material.demo-copper"],
       "publish": {
         "include": true,
@@ -21,6 +26,11 @@
       "kind": "material",
       "source": "assets/materials/demo-copper.material.json",
       "importProfile": "inline-material.v0",
+      "importMetadata": {
+        "sourceHash": "sha256:0190cf1f6ec702431fd1e37e38503b9002978681a989d6382830d92e586ccd6d",
+        "cacheKey": "dev-cache/material/material.demo-copper/0190cf1f6ec7",
+        "generatedArtifactVersion": "asset-import.v1"
+      },
       "dependencies": ["texture.demo-checker"],
       "publish": {
         "include": true,
@@ -36,6 +46,11 @@
       "kind": "texture",
       "source": "assets/textures/demo-checker.texture.json",
       "importProfile": "inline-texture.v0",
+      "importMetadata": {
+        "sourceHash": "sha256:46f863709c0cf4f2d5d03b560f492f5556c3482640b69dddcc6a2ac56b8963d3",
+        "cacheKey": "dev-cache/texture/texture.demo-checker/46f863709c0c",
+        "generatedArtifactVersion": "asset-import.v1"
+      },
       "dependencies": [],
       "publish": {
         "include": true,

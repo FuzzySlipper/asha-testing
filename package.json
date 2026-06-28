@@ -7,6 +7,7 @@
   "scripts": {
     "camera:mover": "node scripts/run-camera-mover.mjs",
     "camera:agora-control": "node scripts/run-camera-agora-control.mjs",
+    "asset:inventory": "node scripts/build-asset-inventory.mjs",
     "voxel:interaction": "node scripts/run-voxel-interaction.mjs",
     "check:boundary": "node scripts/check-boundary.mjs",
     "check:assets": "node scripts/check-assets.mjs",
@@ -23,6 +24,8 @@
     "publish:check": "node scripts/check-publish-artifact.mjs",
     "publish:evidence": "node scripts/generate-publish-evidence.mjs",
     "publish:smoke": "node scripts/run-publish-smoke.mjs",
+    "scene:proof": "node scripts/check-proof-scenes.mjs",
+    "verify:assets-v1": "node scripts/verify-assets-v1.mjs",
     "verify:workflow": "node scripts/verify-game-workflow.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs && npm run check:boundary"
   },

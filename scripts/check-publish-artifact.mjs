@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,6 +86,7 @@ const catalogValidation = validateAshaGameAssetCatalog(
   catalog,
   parsed.manifest,
   relativePath => existsSync(path.join(repoRoot, relativePath)),
+  { sourceHash: relativePath => existsSync(path.join(repoRoot, relativePath)) ? sha256(readFileSync(path.join(repoRoot, relativePath))) : null },
 );
 if (!catalogValidation.ok) fail(`catalog diagnostics: ${JSON.stringify(catalogValidation.diagnostics)}`);
 
@@ -102,6 +103,29 @@ assert.equal(artifact.sourceManifest.hash, sha256(manifestText));
 assert.deepEqual(artifact.publishAssets, expectedPublishAssets);
 assert.equal(artifact.artifactHash, recomputedHash);
 assert.equal(artifact.artifactId, `asha-demo-publish:${artifact.artifactHash}`);
+assert.equal(artifact.resourcePack.entryCount, artifact.publishAssets.entries.length);
+const resourcePackManifestText = await readFile(path.join(repoRoot, artifact.resourcePack.manifestPath), 'utf8');
+assert.equal(artifact.resourcePack.manifestHash, sha256(resourcePackManifestText));
+const resourcePackManifest = JSON.parse(resourcePackManifestText);
+assert.deepEqual(resourcePackManifest.dependencyOrder, artifact.publishAssets.dependencyOrder);
+assert.equal(resourcePackManifest.entries.length, artifact.resourcePack.entryCount);
+const entrypointText = await readFile(path.join(repoRoot, artifact.runnableArtifact.entrypointPath), 'utf8');
+const runtimeMetadataText = await readFile(path.join(repoRoot, artifact.runnableArtifact.runtimeMetadataPath), 'utf8');
+const runnableResourceManifestText = await readFile(path.join(repoRoot, artifact.runnableArtifact.resourceManifestPath), 'utf8');
+assert.equal(artifact.runnableArtifact.target, 'asha-demo-static-reference.v1');
+assert.equal(artifact.runnableArtifact.entrypointHash, sha256(entrypointText));
+assert.equal(artifact.runnableArtifact.runtimeMetadataHash, sha256(runtimeMetadataText));
+assert.equal(artifact.runnableArtifact.resourceManifestHash, sha256(runnableResourceManifestText));
+assert.match(entrypointText, /data-runtime-mode="reference"/);
+assert.match(entrypointText, /resources\/manifest\.json/);
+assert.match(entrypointText, /runtime\/reference-runtime\.json/);
+const runtimeMetadata = JSON.parse(runtimeMetadataText);
+assert.equal(runtimeMetadata.runtimeMode, 'reference');
+assert.equal(runtimeMetadata.launcherName, 'reference-game-runtime-launcher');
+const runnableResourceManifest = JSON.parse(runnableResourceManifestText);
+assert.equal(runnableResourceManifest.target, 'asha-demo-static-reference.v1');
+assert.deepEqual(runnableResourceManifest.dependencyOrder, artifact.publishAssets.dependencyOrder);
+assert.equal(runnableResourceManifest.entries.length, artifact.runnableArtifact.resourceEntryCount);
 assert.deepEqual(artifact.nonClaims, [
   'not_native_runtime_authority',
   'not_hardware_gpu_evidence',
@@ -117,7 +141,22 @@ for (const entry of artifact.publishAssets.entries) {
   assert.equal(compiled.outputKey, entry.outputKey);
   const sourceText = await readFile(path.join(repoRoot, entry.sourcePath), 'utf8');
   assert.equal(compiled.sourceHash, sha256(sourceText));
+  assert.equal(compiled.devImport.importStatus, 'clean');
+  assert.equal(compiled.devImport.generatedArtifactVersion, 'asset-import.v1');
   assert.deepEqual(compiled.payload, JSON.parse(sourceText));
+  const packed = artifact.resourcePack.entries.find(candidate => candidate.assetId === entry.assetId);
+  assert.ok(packed, `resource pack entry missing for ${entry.assetId}`);
+  assert.equal(packed.outputKey, entry.outputKey);
+  const packedText = await readFile(path.join(repoRoot, packed.packedPath), 'utf8');
+  assert.equal(packed.packedHash, sha256(packedText));
+  assert.equal(packed.packedBytes, Buffer.byteLength(packedText));
+  assert.deepEqual(JSON.parse(packedText), compiled.payload);
+  const runnablePacked = runnableResourceManifest.entries.find(candidate => candidate.assetId === entry.assetId);
+  assert.ok(runnablePacked, `runnable resource entry missing for ${entry.assetId}`);
+  const runnablePackedText = await readFile(path.join(repoRoot, artifact.runnableArtifact.directory, runnablePacked.path), 'utf8');
+  assert.equal(runnablePacked.hash, sha256(runnablePackedText));
+  assert.equal(runnablePacked.bytes, Buffer.byteLength(runnablePackedText));
+  assert.deepEqual(JSON.parse(runnablePackedText), compiled.payload);
 }
 
 const summary = {

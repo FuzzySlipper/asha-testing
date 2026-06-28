@@ -64,6 +64,7 @@ const commands = {
   assets: run('npm', ['run', 'check:assets']),
   publicArtifacts: run('npm', ['run', 'check:public-artifacts']),
   boundary: run('npm', ['run', 'check:boundary']),
+  assetsV1: run('npm', ['run', 'verify:assets-v1']),
   devSmoke: run('npm', ['run', 'dev:smoke']),
   publishEvidence: run('npm', ['run', 'publish:evidence']),
   studioTests: run('pnpm', ['run', 'test'], studioRoot),
@@ -75,10 +76,12 @@ for (const result of Object.values(commands)) {
 }
 
 const devSmoke = await readArtifact('harness/out/dev-smoke/latest/index.json');
+const assetsV1 = await readArtifact('harness/out/assets-v1/latest/index.json');
 const publishEvidence = await readArtifact('harness/out/publish-evidence/latest/index.json');
 assert.equal(devSmoke.json.client.status, 'ok');
 assert.equal(devSmoke.json.client.command.status, 'accepted');
 assert.equal(devSmoke.json.client.rejectedCommand.status, 'rejected');
+assert.equal(assetsV1.json.artifactKind, 'asha_demo_assets_v1_verification');
 assert.equal(publishEvidence.json.publishSmoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
 
 const body = {
@@ -95,6 +98,12 @@ const body = {
       replayPath: devSmoke.json.client.replay.path,
       commandEvidencePath: devSmoke.json.client.evidence.path,
     },
+    assetsV1: {
+      path: assetsV1.path,
+      fileHash: assetsV1.fileHash,
+      resourcePackEntryCount: assetsV1.json.artifacts.publishArtifact.resourcePackEntryCount,
+      inventoryEntryCount: assetsV1.json.artifacts.assetInventory.entryCount,
+    },
     publishEvidence: {
       path: publishEvidence.path,
       fileHash: publishEvidence.fileHash,
@@ -108,6 +117,7 @@ const body = {
     'assets_valid',
     'public_artifacts_available',
     'demo_boundary_passed',
+    'assets_v1_verification_passed',
     'devtools_attach_smoke_passed',
     'publish_evidence_passed',
     'studio_attach_tests_passed',

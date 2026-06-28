@@ -280,6 +280,129 @@ test('asset catalog checker fails closed on unsupported asset kind', async () =>
   }
 });
 
+test('asset catalog checker fails closed on stale import metadata', async () => {
+  const catalogUrl = new URL('../packages/game-catalogs/catalog.json', import.meta.url);
+  const original = await readFile(catalogUrl, 'utf8');
+  try {
+    const catalog = JSON.parse(original);
+    catalog.entries[0].importMetadata.sourceHash = 'sha256:stale';
+    await writeFile(catalogUrl, `${JSON.stringify(catalog, null, 2)}\n`);
+    const result = spawnSync(process.execPath, ['scripts/check-assets.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /stale_import_metadata/);
+  } finally {
+    await writeFile(catalogUrl, original);
+  }
+});
+
+test('asset catalog checker fails closed on missing dependency', async () => {
+  const catalogUrl = new URL('../packages/game-catalogs/catalog.json', import.meta.url);
+  const original = await readFile(catalogUrl, 'utf8');
+  try {
+    const catalog = JSON.parse(original);
+    catalog.entries[0].dependencies = ['asset.missing'];
+    await writeFile(catalogUrl, `${JSON.stringify(catalog, null, 2)}\n`);
+    const result = spawnSync(process.execPath, ['scripts/check-assets.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /missing_asset_dependency/);
+  } finally {
+    await writeFile(catalogUrl, original);
+  }
+});
+
+test('proof scene checker validates named scenes and catalog references', () => {
+  const result = spawnSync('npm', ['run', 'scene:proof'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /proof scene check: OK/);
+});
+
+test('proof scene checker fails closed on missing catalog references', async () => {
+  const sceneUrl = new URL('../scenes/material-proof.scene.json', import.meta.url);
+  const original = await readFile(sceneUrl, 'utf8');
+  try {
+    const scene = JSON.parse(original);
+    scene.catalogAssetIds.push('asset.missing');
+    await writeFile(sceneUrl, `${JSON.stringify(scene, null, 2)}\n`);
+    const result = spawnSync(process.execPath, ['scripts/check-proof-scenes.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /asset\.missing/);
+  } finally {
+    await writeFile(sceneUrl, original);
+  }
+});
+
+test('asset inventory read model reports dev and publish resolution', async () => {
+  const publish = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(publish.status, 0, publish.stdout + publish.stderr);
+  const result = spawnSync('npm', ['run', 'asset:inventory'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/asset-inventory\/latest\/index\.json/);
+  const inventory = JSON.parse(await readFile(new URL('../harness/out/asset-inventory/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(inventory.artifactKind, 'asha_demo_asset_inventory');
+  assert.equal(inventory.status, 'ok');
+  assert.deepEqual(inventory.dependencyOrder, ['texture.demo-checker', 'material.demo-copper', 'mesh.demo-cube']);
+  const mesh = inventory.entries.find((entry) => entry.assetId === 'mesh.demo-cube');
+  assert.equal(mesh.devResolution.importStatus, 'clean');
+  assert.match(mesh.devResolution.sourceHash, /^sha256:/);
+  assert.equal(mesh.publishResolution.outputKey, 'meshes/demo-cube.mesh.json');
+  assert.match(mesh.publishResolution.packedHash, /^sha256:/);
+  assert.equal(mesh.evidenceRefs.some((ref) => ref.kind === 'source'), true);
+});
+
+test('asset inventory read model carries missing asset and stale metadata diagnostics', async () => {
+  const catalogUrl = new URL('../packages/game-catalogs/catalog.json', import.meta.url);
+  const badUrl = new URL('../harness/out/asset-inventory/bad-catalog.json', import.meta.url);
+  const catalog = JSON.parse(await readFile(catalogUrl, 'utf8'));
+  catalog.entries[1].importMetadata.sourceHash = 'sha256:stale';
+  catalog.entries[2].source = 'assets/textures/missing.texture.json';
+  await mkdir(new URL('../harness/out/asset-inventory/', import.meta.url), { recursive: true });
+  await writeFile(badUrl, `${JSON.stringify(catalog, null, 2)}\n`);
+  const result = spawnSync(process.execPath, ['scripts/build-asset-inventory.mjs', 'harness/out/asset-inventory/bad-catalog.json'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const inventory = JSON.parse(await readFile(new URL('../harness/out/asset-inventory/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(inventory.status, 'diagnostics');
+  assert.equal(inventory.diagnostics.some((diagnostic) => diagnostic.code === 'missing_asset_file'), true);
+  assert.equal(inventory.diagnostics.some((diagnostic) => diagnostic.code === 'stale_import_metadata'), true);
+  await rm(badUrl, { force: true });
+});
+
+test('asset/resource V1 aggregate verification writes evidence', async () => {
+  await rm(new URL('../harness/out/assets-v1/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync('npm', ['run', 'verify:assets-v1'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/assets-v1\/latest\/index\.json/);
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/assets-v1/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_assets_v1_verification');
+  assert.equal(artifact.artifacts.publishArtifact.resourcePackEntryCount, 3);
+  assert.equal(artifact.artifacts.assetInventory.entryCount, 3);
+  assert.ok(artifact.validations.includes('resource_pack_readback_valid'));
+});
+
 test('dev runtime exposes typed devtools endpoint for a separate headless client', async () => {
   const runtime = spawn(process.execPath, ['scripts/dev-runtime.mjs', '--port', '0'], {
     cwd: repoRoot,
@@ -313,6 +436,7 @@ test('dev runtime exposes typed devtools endpoint for a separate headless client
     });
     assert.equal(listening.status, 'listening');
     assert.equal(listening.scene.name, 'ASHA Demo Minimal Cube');
+    assert.equal(listening.proofScenes.some((scene) => scene.name === 'ASHA Demo Material Proof'), true);
 
     const client = spawnSync(process.execPath, ['scripts/check-devtools-endpoint.mjs', listening.endpoint], {
       cwd: repoRoot,
@@ -344,6 +468,10 @@ test('headless dev smoke starts runtime, reads endpoint, and writes evidence', a
   const artifact = JSON.parse(await readFile(new URL('../harness/out/dev-smoke/latest/index.json', import.meta.url), 'utf8'));
   assert.equal(artifact.scene.sceneId, 1001);
   assert.equal(artifact.scene.name, 'ASHA Demo Minimal Cube');
+  assert.deepEqual(
+    artifact.proofScenes.find((scene) => scene.name === 'ASHA Demo Material Proof')?.catalogAssetIds,
+    ['mesh.demo-cube', 'material.demo-copper', 'texture.demo-checker'],
+  );
   assert.equal(artifact.client.status, 'ok');
   assert.equal(artifact.client.runtime.runtimeMode, 'reference');
   assert.equal(artifact.client.runtime.launcherName, 'reference-game-runtime-launcher');
@@ -455,7 +583,10 @@ test('publish artifact build writes compiled scene catalog and asset payloads', 
   assert.equal(artifact.game.id, 'asha-demo');
   assert.equal(artifact.commands.publish, 'npm run publish:artifact');
   assert.equal(artifact.commands.verify, 'npm run conformance');
-  assert.equal(artifact.scenes.at(0)?.scene.name, 'ASHA Demo Minimal Cube');
+  assert.deepEqual(artifact.scenes.map((entry) => entry.scene.name), [
+    'ASHA Demo Material Proof',
+    'ASHA Demo Minimal Cube',
+  ]);
   assert.deepEqual(artifact.publishAssets.entries.map((entry) => entry.assetId), [
     'mesh.demo-cube',
     'material.demo-copper',
@@ -476,6 +607,18 @@ test('publish artifact build writes compiled scene catalog and asset payloads', 
     'inline-material',
     'inline-texture',
   ]);
+  assert.equal(artifact.resourcePack.entryCount, 3);
+  assert.equal(artifact.resourcePack.manifestPath, 'harness/out/publish/resources/manifest.json');
+  assert.deepEqual(artifact.resourcePack.entries.map((entry) => entry.outputKey), [
+    'meshes/demo-cube.mesh.json',
+    'materials/demo-copper.material.json',
+    'textures/demo-checker.texture.json',
+  ]);
+  assert.equal(artifact.runnableArtifact.target, 'asha-demo-static-reference.v1');
+  assert.equal(artifact.runnableArtifact.entrypointPath, 'harness/out/publish/runnable/latest/index.html');
+  assert.equal(artifact.runnableArtifact.runtimeMetadataPath, 'harness/out/publish/runnable/latest/runtime/reference-runtime.json');
+  assert.equal(artifact.runnableArtifact.resourceManifestPath, 'harness/out/publish/runnable/latest/resources/manifest.json');
+  assert.equal(artifact.runnableArtifact.resourceEntryCount, 3);
   assert.deepEqual(artifact.nonClaims, [
     'not_native_runtime_authority',
     'not_hardware_gpu_evidence',
@@ -526,6 +669,22 @@ test('publish artifact checker rejects dev-only Studio leakage', async () => {
   }
 });
 
+test('publish artifact checker rejects missing packed resource files', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const packedUrl = new URL('../harness/out/publish/resources/meshes/demo-cube.mesh.json', import.meta.url);
+  await rm(packedUrl, { force: true });
+  const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.notEqual(check.status, 0, check.stdout + check.stderr);
+  assert.match(check.stderr + check.stdout, /demo-cube\.mesh\.json/);
+});
+
 test('publish evidence manifest validates build smoke and dependency guard correlation', async () => {
   await rm(new URL('../harness/out/publish-evidence/', import.meta.url), { recursive: true, force: true });
   const result = spawnSync(process.execPath, ['scripts/generate-publish-evidence.mjs'], {
@@ -565,6 +724,7 @@ test('aggregate game workflow verification gates dev Studio attach and publish',
   const artifact = JSON.parse(await readFile(new URL('../harness/out/game-workflow/latest/index.json', import.meta.url), 'utf8'));
   assert.equal(artifact.artifactKind, 'asha_demo_game_workflow_verification');
   assert.equal(artifact.commands.devSmoke.status, 'passed');
+  assert.equal(artifact.commands.assetsV1.status, 'passed');
   assert.equal(artifact.commands.publishEvidence.status, 'passed');
   assert.equal(artifact.commands.studioTests.status, 'passed');
   assert.equal(artifact.commands.studioBoundaries.status, 'passed');
@@ -572,8 +732,11 @@ test('aggregate game workflow verification gates dev Studio attach and publish',
   assert.equal(artifact.artifacts.devSmoke.afterCommandWorldHash, 'reference-world:asha-demo:1001:accepted:1');
   assert.equal(artifact.artifacts.devSmoke.replayPath, 'harness/out/replay/dev-smoke-command-path.json');
   assert.equal(artifact.artifacts.devSmoke.commandEvidencePath, 'harness/out/devtools/latest/index.json');
+  assert.equal(artifact.artifacts.assetsV1.resourcePackEntryCount, 3);
+  assert.equal(artifact.artifacts.assetsV1.inventoryEntryCount, 3);
   assert.match(artifact.artifacts.publishEvidence.evidenceHash, /^sha256:/);
   assert.ok(artifact.validations.includes('devtools_attach_smoke_passed'));
+  assert.ok(artifact.validations.includes('assets_v1_verification_passed'));
   assert.ok(artifact.validations.includes('studio_attach_tests_passed'));
   assert.ok(artifact.validations.includes('publish_evidence_passed'));
   assert.match(artifact.artifactId, /^asha-demo-game-workflow:sha256:/);

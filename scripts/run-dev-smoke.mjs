@@ -72,6 +72,7 @@ const artifact = {
   generatedAt: 'deterministic-as-structure-only',
   endpoint: listening.endpoint,
   scene: listening.scene,
+  proofScenes: listening.proofScenes,
   loadedWorld: listening.loadedWorld,
   client: clientSummary,
   logs: {
@@ -85,6 +86,11 @@ const artifact = {
 };
 
 assert.equal(artifact.scene.sceneId, 1001);
+assert.equal(artifact.proofScenes.some((scene) => scene.name === 'ASHA Demo Material Proof'), true);
+assert.deepEqual(
+  artifact.proofScenes.find((scene) => scene.name === 'ASHA Demo Material Proof')?.catalogAssetIds,
+  ['mesh.demo-cube', 'material.demo-copper', 'texture.demo-checker'],
+);
 assert.equal(artifact.client.runtime.runtimeMode, 'reference');
 assert.equal(artifact.client.runtime.launcherName, 'reference-game-runtime-launcher');
 assert.equal(artifact.client.projection.worldHash, 'reference-world:asha-demo:1001:accepted:0');
