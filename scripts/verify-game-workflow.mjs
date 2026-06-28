@@ -78,6 +78,7 @@ const devSmoke = await readArtifact('harness/out/dev-smoke/latest/index.json');
 const publishEvidence = await readArtifact('harness/out/publish-evidence/latest/index.json');
 assert.equal(devSmoke.json.client.status, 'ok');
 assert.equal(devSmoke.json.client.command.status, 'accepted');
+assert.equal(devSmoke.json.client.rejectedCommand.status, 'rejected');
 assert.equal(publishEvidence.json.publishSmoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
 
 const body = {
@@ -91,6 +92,8 @@ const body = {
       fileHash: devSmoke.fileHash,
       worldHash: devSmoke.json.client.projection.worldHash,
       afterCommandWorldHash: devSmoke.json.client.afterProjection.worldHash,
+      replayPath: devSmoke.json.client.replay.path,
+      commandEvidencePath: devSmoke.json.client.evidence.path,
     },
     publishEvidence: {
       path: publishEvidence.path,

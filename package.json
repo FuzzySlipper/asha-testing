@@ -16,6 +16,7 @@
     "conformance": "node scripts/run-conformance.mjs",
     "conformance:agora": "ASHA_DEMO_AGORA_EVIDENCE=live node scripts/run-conformance.mjs",
     "dev": "node scripts/dev-runtime.mjs",
+    "dev:authority-smoke": "node scripts/run-dev-authority-smoke.mjs",
     "dev:smoke": "node scripts/run-dev-smoke.mjs",
     "devtools:smoke": "node scripts/check-devtools-endpoint.mjs",
     "publish:artifact": "node scripts/build-publish-artifact.mjs",

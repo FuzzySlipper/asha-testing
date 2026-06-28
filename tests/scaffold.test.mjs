@@ -81,6 +81,27 @@ test('boundary checker rejects forbidden CommonJS require imports', async () => 
   }
 });
 
+test('boundary checker rejects forbidden raw runtime transport ESM imports', async () => {
+  const srcDir = new URL('../src/', import.meta.url);
+  const badFile = new URL('../src/raw-transport.mjs', import.meta.url);
+  const forbiddenPackage = '@asha/' + 'wasm-replay-bridge';
+  await mkdir(srcDir, { recursive: true });
+  try {
+    await writeFile(
+      badFile,
+      `import * as replayTransport from '${forbiddenPackage}';\nvoid replayTransport;\n`,
+    );
+    const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, new RegExp(forbiddenPackage));
+  } finally {
+    await rm(srcDir, { recursive: true, force: true });
+  }
+});
+
 test('boundary checker rejects forbidden ASHA package dependencies', async () => {
   const packageJsonUrl = new URL('../package.json', import.meta.url);
   const original = await readFile(packageJsonUrl, 'utf8');
@@ -282,9 +303,13 @@ test('dev runtime exposes typed devtools endpoint for a separate headless client
     assert.equal(client.status, 0, client.stdout + client.stderr);
     const smoke = JSON.parse(client.stdout);
     assert.equal(smoke.status, 'ok');
-    assert.equal(smoke.projection.worldHash, 'world:1001:1001');
+    assert.equal(smoke.runtime.runtimeMode, 'reference');
+    assert.equal(smoke.runtime.launcherName, 'reference-game-runtime-launcher');
+    assert.equal(smoke.projection.worldHash, 'reference-world:asha-demo:1001:accepted:0');
     assert.equal(smoke.command.status, 'accepted');
-    assert.equal(smoke.afterProjection.worldHash, 'world:1001:1001:commands:1');
+    assert.equal(smoke.rejectedCommand.status, 'rejected');
+    assert.equal(smoke.rejectedCommand.authorityHashAfter, smoke.command.authorityHashAfter);
+    assert.equal(smoke.afterProjection.worldHash, 'reference-world:asha-demo:1001:accepted:1');
   } finally {
     runtime.kill('SIGTERM');
   }
@@ -302,11 +327,100 @@ test('headless dev smoke starts runtime, reads endpoint, and writes evidence', a
   assert.equal(artifact.scene.sceneId, 1001);
   assert.equal(artifact.scene.name, 'ASHA Demo Minimal Cube');
   assert.equal(artifact.client.status, 'ok');
-  assert.equal(artifact.client.projection.worldHash, 'world:1001:1001');
+  assert.equal(artifact.client.runtime.runtimeMode, 'reference');
+  assert.equal(artifact.client.runtime.launcherName, 'reference-game-runtime-launcher');
+  assert.equal(artifact.client.projection.worldHash, 'reference-world:asha-demo:1001:accepted:0');
   assert.equal(artifact.client.command.status, 'accepted');
-  assert.equal(artifact.client.command.authorityHashAfter, 'authority:1001:commands:1');
-  assert.equal(artifact.client.afterProjection.worldHash, 'world:1001:1001:commands:1');
+  assert.equal(artifact.client.command.authorityHashAfter, 'reference-authority:workspace.local:1001:accepted:1');
+  assert.equal(artifact.client.rejectedCommand.status, 'rejected');
+  assert.equal(artifact.client.rejectedCommand.authorityHashAfter, artifact.client.command.authorityHashAfter);
+  assert.equal(artifact.client.afterProjection.worldHash, 'reference-world:asha-demo:1001:accepted:1');
+  assert.equal(artifact.client.replay.path, 'harness/out/replay/dev-smoke-command-path.json');
+  assert.equal(artifact.client.evidence.path, 'harness/out/devtools/latest/index.json');
   assert.equal(artifact.shutdown.exitCode, 0);
+});
+
+test('dev runtime command evidence readback fails closed on missing authority hashes', async () => {
+  const smoke = spawnSync(process.execPath, ['scripts/run-dev-smoke.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(smoke.status, 0, smoke.stdout + smoke.stderr);
+
+  const good = spawnSync(process.execPath, ['scripts/check-dev-runtime-command-evidence.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(good.status, 0, good.stdout + good.stderr);
+  assert.match(good.stdout, /dev runtime command evidence check: OK/);
+
+  const evidenceUrl = new URL('../harness/out/devtools/latest/index.json', import.meta.url);
+  const badUrl = new URL('../harness/out/devtools/latest/bad-missing-before.json', import.meta.url);
+  const evidence = JSON.parse(await readFile(evidenceUrl, 'utf8'));
+  delete evidence.commandReceipts[0].authorityHashBefore;
+  await writeFile(badUrl, `${JSON.stringify(evidence, null, 2)}\n`);
+  try {
+    const bad = spawnSync(process.execPath, ['scripts/check-dev-runtime-command-evidence.mjs', 'harness/out/devtools/latest/bad-missing-before.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(bad.status, 0, bad.stdout + bad.stderr);
+    assert.match(bad.stderr, /authorityHashBefore/);
+  } finally {
+    await rm(badUrl, { force: true });
+  }
+
+  const missingNonClaimUrl = new URL('../harness/out/devtools/latest/bad-missing-nonclaim.json', import.meta.url);
+  const missingNonClaim = JSON.parse(await readFile(evidenceUrl, 'utf8'));
+  missingNonClaim.nonClaims = missingNonClaim.nonClaims.filter((nonClaim) => nonClaim !== 'not_native_runtime');
+  await writeFile(missingNonClaimUrl, `${JSON.stringify(missingNonClaim, null, 2)}\n`);
+  try {
+    const bad = spawnSync(process.execPath, ['scripts/check-dev-runtime-command-evidence.mjs', 'harness/out/devtools/latest/bad-missing-nonclaim.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(bad.status, 0, bad.stdout + bad.stderr);
+    assert.match(bad.stderr, /not_native_runtime/);
+  } finally {
+    await rm(missingNonClaimUrl, { force: true });
+  }
+
+  const nativeNoProofUrl = new URL('../harness/out/devtools/latest/bad-native-no-proof.json', import.meta.url);
+  const nativeNoProof = JSON.parse(await readFile(evidenceUrl, 'utf8'));
+  nativeNoProof.runtime.runtimeMode = 'native';
+  await writeFile(nativeNoProofUrl, `${JSON.stringify(nativeNoProof, null, 2)}\n`);
+  try {
+    const bad = spawnSync(process.execPath, ['scripts/check-dev-runtime-command-evidence.mjs', 'harness/out/devtools/latest/bad-native-no-proof.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(bad.status, 0, bad.stdout + bad.stderr);
+    assert.match(bad.stderr, /nativeProofRef/);
+  } finally {
+    await rm(nativeNoProofUrl, { force: true });
+  }
+});
+
+test('focused dev authority smoke records runtime mode, command hashes, and evidence paths', async () => {
+  await rm(new URL('../harness/out/dev-authority-smoke/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync('npm', ['run', 'dev:authority-smoke'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/dev-authority-smoke\/latest\/index\.json/);
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/dev-authority-smoke/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_dev_authority_smoke');
+  assert.equal(artifact.runtime.runtimeMode, 'reference');
+  assert.equal(artifact.runtime.launcherName, 'reference-game-runtime-launcher');
+  assert.equal(artifact.acceptedCommand.status, 'accepted');
+  assert.equal(artifact.rejectedCommand.status, 'rejected');
+  assert.notEqual(artifact.acceptedCommand.authorityHashBefore, artifact.acceptedCommand.authorityHashAfter);
+  assert.equal(artifact.rejectedCommand.authorityHashBefore, artifact.rejectedCommand.authorityHashAfter);
+  assert.equal(artifact.artifacts.replay.path, 'harness/out/replay/dev-smoke-command-path.json');
+  assert.equal(artifact.artifacts.commandEvidence.path, 'harness/out/devtools/latest/index.json');
+  assert.ok(artifact.validations.includes('command_evidence_readback_passed'));
 });
 
 test('publish artifact build writes compiled scene catalog and asset payloads', async () => {
@@ -419,8 +533,10 @@ test('aggregate game workflow verification gates dev Studio attach and publish',
   assert.equal(artifact.commands.publishEvidence.status, 'passed');
   assert.equal(artifact.commands.studioTests.status, 'passed');
   assert.equal(artifact.commands.studioBoundaries.status, 'passed');
-  assert.equal(artifact.artifacts.devSmoke.worldHash, 'world:1001:1001');
-  assert.equal(artifact.artifacts.devSmoke.afterCommandWorldHash, 'world:1001:1001:commands:1');
+  assert.equal(artifact.artifacts.devSmoke.worldHash, 'reference-world:asha-demo:1001:accepted:0');
+  assert.equal(artifact.artifacts.devSmoke.afterCommandWorldHash, 'reference-world:asha-demo:1001:accepted:1');
+  assert.equal(artifact.artifacts.devSmoke.replayPath, 'harness/out/replay/dev-smoke-command-path.json');
+  assert.equal(artifact.artifacts.devSmoke.commandEvidencePath, 'harness/out/devtools/latest/index.json');
   assert.match(artifact.artifacts.publishEvidence.evidenceHash, /^sha256:/);
   assert.ok(artifact.validations.includes('devtools_attach_smoke_passed'));
   assert.ok(artifact.validations.includes('studio_attach_tests_passed'));
