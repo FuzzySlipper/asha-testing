@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "inline-texture",
+  "label": "Demo Checker",
+  "size": [2, 2],
+  "format": "rgba8",
+  "pixels": [
+    [255, 255, 255, 255],
+    [30, 30, 30, 255],
+    [30, 30, 30, 255],
+    [255, 255, 255, 255]
+  ]
+}

@@ -6,6 +6,7 @@
       "kind": "static_mesh",
       "source": "assets/meshes/demo-cube.mesh.json",
       "importProfile": "inline-static-mesh.v0",
+      "dependencies": ["material.demo-copper"],
       "publish": {
         "include": true,
         "outputKey": "meshes/demo-cube.mesh.json"
@@ -13,6 +14,36 @@
       "diagnostics": {
         "owner": "asha-demo",
         "notes": ["minimal game-workflow asset fixture"]
+      }
+    },
+    {
+      "id": "material.demo-copper",
+      "kind": "material",
+      "source": "assets/materials/demo-copper.material.json",
+      "importProfile": "inline-material.v0",
+      "dependencies": ["texture.demo-checker"],
+      "publish": {
+        "include": true,
+        "outputKey": "materials/demo-copper.material.json"
+      },
+      "diagnostics": {
+        "owner": "asha-demo",
+        "notes": ["material fixture for multi-kind catalog validation"]
+      }
+    },
+    {
+      "id": "texture.demo-checker",
+      "kind": "texture",
+      "source": "assets/textures/demo-checker.texture.json",
+      "importProfile": "inline-texture.v0",
+      "dependencies": [],
+      "publish": {
+        "include": true,
+        "outputKey": "textures/demo-checker.texture.json"
+      },
+      "diagnostics": {
+        "owner": "asha-demo",
+        "notes": ["texture fixture for multi-kind catalog validation"]
       }
     }
   ]

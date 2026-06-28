@@ -30,15 +30,17 @@ if (!manifestResult.ok) {
   if (!validation.ok) {
     for (const diagnostic of validation.diagnostics) fail(`${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`);
   } else {
-    const resolution = resolveAshaGameAssetForDev(validation.catalog, 'mesh.demo-cube');
-    if (resolution === null) {
-      fail('mesh.demo-cube did not resolve through the catalog');
-    } else if (!existsSync(join(repoRoot, resolution.sourcePath))) {
-      fail(`resolved source file is missing: ${resolution.sourcePath}`);
-    }
     const publishManifest = buildAshaGamePublishAssetManifest(validation.catalog);
-    if (!publishManifest.entries.some((entry) => entry.assetId === 'mesh.demo-cube')) {
-      fail('publish asset manifest does not include mesh.demo-cube');
+    for (const assetId of ['mesh.demo-cube', 'material.demo-copper', 'texture.demo-checker']) {
+      const resolution = resolveAshaGameAssetForDev(validation.catalog, assetId);
+      if (resolution === null) {
+        fail(`${assetId} did not resolve through the catalog`);
+      } else if (!existsSync(join(repoRoot, resolution.sourcePath))) {
+        fail(`resolved source file is missing: ${resolution.sourcePath}`);
+      }
+      if (!publishManifest.entries.some((entry) => entry.assetId === assetId)) {
+        fail(`publish asset manifest does not include ${assetId}`);
+      }
     }
   }
 }

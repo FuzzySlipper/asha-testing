@@ -72,6 +72,10 @@ if (!existsSync(manifestPath)) {
     for (const root of parsed.manifest.workspace.policyPackages) ensurePathExists(root, 'workspace.policy_packages');
     ensurePathExists(parsed.manifest.runtime.wasmOrNativeEntry, 'runtime.wasm_or_native_entry');
     ensurePathExists(parsed.manifest.publish.artifactDir, 'publish.artifact_dir');
+    for (const root of parsed.manifest.devResourceProfile.localRoots) ensurePathExists(root, 'dev_resource_profile.local_roots');
+    ensureInsideRepo(parsed.manifest.devResourceProfile.cacheDir, 'dev_resource_profile.cache_dir');
+    ensureInsideRepo(parsed.manifest.publishResourceProfile.outputDir, 'publish_resource_profile.output_dir');
+    ensureInsideRepo(parsed.manifest.publishResourceProfile.archiveDir, 'publish_resource_profile.archive_dir');
     ensureCommandExists(parsed.manifest.runtime.devCommand, 'runtime.dev_command');
     ensureCommandExists(parsed.manifest.publish.command, 'publish.command');
     ensureCommandExists(parsed.manifest.publish.verifyCommand, 'publish.verify_command');

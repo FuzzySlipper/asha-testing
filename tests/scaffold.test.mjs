@@ -262,6 +262,24 @@ test('asset catalog checker validates the real demo asset and dev resolution', (
   assert.match(result.stdout, /asset catalog check: OK/);
 });
 
+test('asset catalog checker fails closed on unsupported asset kind', async () => {
+  const catalogUrl = new URL('../packages/game-catalogs/catalog.json', import.meta.url);
+  const original = await readFile(catalogUrl, 'utf8');
+  try {
+    const catalog = JSON.parse(original);
+    catalog.entries[0].kind = 'shader';
+    await writeFile(catalogUrl, `${JSON.stringify(catalog, null, 2)}\n`);
+    const result = spawnSync(process.execPath, ['scripts/check-assets.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr, /unsupported_asset_kind/);
+  } finally {
+    await writeFile(catalogUrl, original);
+  }
+});
+
 test('dev runtime exposes typed devtools endpoint for a separate headless client', async () => {
   const runtime = spawn(process.execPath, ['scripts/dev-runtime.mjs', '--port', '0'], {
     cwd: repoRoot,
@@ -438,9 +456,26 @@ test('publish artifact build writes compiled scene catalog and asset payloads', 
   assert.equal(artifact.commands.publish, 'npm run publish:artifact');
   assert.equal(artifact.commands.verify, 'npm run conformance');
   assert.equal(artifact.scenes.at(0)?.scene.name, 'ASHA Demo Minimal Cube');
-  assert.equal(artifact.publishAssets.entries.at(0)?.assetId, 'mesh.demo-cube');
-  assert.equal(artifact.compiledAssets.at(0)?.outputKey, 'meshes/demo-cube.mesh.json');
-  assert.equal(artifact.compiledAssets.at(0)?.payload.kind, 'inline-static-mesh');
+  assert.deepEqual(artifact.publishAssets.entries.map((entry) => entry.assetId), [
+    'mesh.demo-cube',
+    'material.demo-copper',
+    'texture.demo-checker',
+  ]);
+  assert.deepEqual(artifact.publishAssets.dependencyOrder, [
+    'texture.demo-checker',
+    'material.demo-copper',
+    'mesh.demo-cube',
+  ]);
+  assert.deepEqual(artifact.compiledAssets.map((entry) => entry.outputKey), [
+    'meshes/demo-cube.mesh.json',
+    'materials/demo-copper.material.json',
+    'textures/demo-checker.texture.json',
+  ]);
+  assert.deepEqual(artifact.compiledAssets.map((entry) => entry.payload.kind), [
+    'inline-static-mesh',
+    'inline-material',
+    'inline-texture',
+  ]);
   assert.deepEqual(artifact.nonClaims, [
     'not_native_runtime_authority',
     'not_hardware_gpu_evidence',
@@ -461,8 +496,8 @@ test('publish artifact smoke verifies hashes payloads and writes readback eviden
   const smoke = JSON.parse(await readFile(new URL('../harness/out/publish-smoke/latest/index.json', import.meta.url), 'utf8'));
   assert.equal(smoke.build.status, 'passed');
   assert.equal(smoke.readback.status, 'ok');
-  assert.equal(smoke.readback.compiledAssetCount, 1);
-  assert.equal(smoke.readback.publishAssetCount, 1);
+  assert.equal(smoke.readback.compiledAssetCount, 3);
+  assert.equal(smoke.readback.publishAssetCount, 3);
   assert.equal(smoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
   assert.ok(smoke.checks.includes('artifact_hash_recomputed'));
   assert.ok(smoke.checks.includes('compiled_assets_match_sources'));
@@ -503,7 +538,7 @@ test('publish evidence manifest validates build smoke and dependency guard corre
   assert.equal(evidence.evidenceKind, 'asha_demo_publish_evidence_manifest');
   assert.equal(evidence.evidenceVersion, 'publish-evidence.v0');
   assert.equal(evidence.publishArtifact.artifactVersion, 'publish-artifact.v0');
-  assert.equal(evidence.publishArtifact.compiledAssetCount, 1);
+  assert.equal(evidence.publishArtifact.compiledAssetCount, 3);
   assert.equal(evidence.publishArtifact.artifactHash, evidence.publishSmoke.readback.artifactHash);
   assert.equal(evidence.publishSmoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
   assert.ok(evidence.validations.includes('publish_artifact_hash_matches_readback'));

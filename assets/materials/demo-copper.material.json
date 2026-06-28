@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "kind": "inline-material",
+  "label": "Demo Copper",
+  "baseColor": [0.8, 0.42, 0.22, 1.0],
+  "roughness": 0.55,
+  "metallic": 0.1,
+  "texture": "texture.demo-checker"
+}

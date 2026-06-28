@@ -27,3 +27,13 @@ allowed_source_writes = ["scenes", "assets", "packages/game-catalogs", "packages
 command = "npm run publish:artifact"
 artifact_dir = "harness/out"
 verify_command = "npm run conformance"
+
+[dev_resource_profile]
+local_roots = ["assets", "packages/game-catalogs"]
+cache_dir = "harness/out/dev-cache"
+resolution_policy = "prefer-source"
+
+[publish_resource_profile]
+output_dir = "harness/out/publish/resources"
+archive_dir = "harness/out/publish/archive"
+resolution_policy = "locked"

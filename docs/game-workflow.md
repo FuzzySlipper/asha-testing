@@ -51,6 +51,8 @@ The smoke starts the runtime on an ephemeral port, performs a typed handshake, p
 
 ## Publish
 
+V1 runnable target decision: [`docs/runnable-publish-target.md`](./runnable-publish-target.md).
+
 Build the compiled publish artifact:
 
 ```bash
