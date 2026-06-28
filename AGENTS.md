@@ -6,6 +6,8 @@ Allowed imports/calls (see `boundary-policy.json` for the machine-readable list)
 
 - `@asha/contracts`
 - `@asha/runtime-bridge`
+- `@asha/devtools`
+- `@asha/game-workspace`
 - approved ASHA CLI/tool commands documented by the current task
 - `@asha/renderer-three` only when a future task explicitly marks it as an unstable demo/render-evidence surface and updates the boundary policy accordingly
 
@@ -23,7 +25,7 @@ If the public ASHA surface cannot express the test, create an engine feature req
 
 ## Missing public surface workflow
 
-1. Try the current public surface first (`@asha/contracts`, `@asha/runtime-bridge`, or an approved ASHA CLI/tool command).
+1. Try the current public surface first (`@asha/contracts`, `@asha/runtime-bridge`, `@asha/devtools`, `@asha/game-workspace`, or an approved ASHA CLI/tool command).
 2. If blocked, fill out `docs/engine-feature-request-template.md` and post/link it in the ASHA Den project. The request must explain the consumer use case, attempted public interface, missing capability, proposed engine surface, authority/projection/contract effects, required evidence, lane guess, and why the request is engine-level rather than demo/product-specific.
 3. Use `docs/temporary-adapter-template.md` only when a planner/steward explicitly approves a short-lived adapter. The adapter must link the engine feature request, include approval and expiry, live only in this consumer repo, carry evidence for why it was needed, and include review/removal steps.
 4. Missing public surface is never permission to import ASHA internals, raw native/WASM transports, generated file paths, or arbitrary JSON/runtime tunnels.

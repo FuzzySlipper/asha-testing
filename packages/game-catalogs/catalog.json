@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "mesh.demo-cube",
+      "kind": "static_mesh",
+      "source": "assets/meshes/demo-cube.mesh.json",
+      "importProfile": "inline-static-mesh.v0",
+      "publish": {
+        "include": true,
+        "outputKey": "meshes/demo-cube.mesh.json"
+      },
+      "diagnostics": {
+        "owner": "asha-demo",
+        "notes": ["minimal game-workflow asset fixture"]
+      }
+    }
+  ]
+}

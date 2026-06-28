@@ -14,10 +14,12 @@ It is **not**:
 
 V1 is TypeScript/runtime-bridge first. The machine-readable source of truth for the current allow/deny list is `boundary-policy.json`; prose in this README and `AGENTS.md` must agree with that file.
 
-The only ASHA package dependencies in this scaffold are:
+The approved ASHA package roots for the game-workflow scaffold are:
 
 - `@asha/contracts` via `file:../asha/ts/packages/contracts`
 - `@asha/runtime-bridge` via `file:../asha/ts/packages/runtime-bridge`
+- `@asha/devtools` via `file:../asha/ts/packages/devtools` or ASHA public package bundle tarball
+- `@asha/game-workspace` via `file:../asha/ts/packages/game-workspace` or ASHA public package bundle tarball
 
 `@asha/runtime-bridge` is the only package that may mediate native runtime behavior. `asha-demo` must not import `@asha/native-bridge`, `@asha/wasm-replay-bridge`, ASHA package `src/*` paths, Rust crates, or generated contract files directly.
 

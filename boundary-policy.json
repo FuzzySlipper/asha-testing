@@ -1,7 +1,12 @@
 {
   "$schema": "./schemas/boundary-policy.schema.json",
   "typescript": {
-    "allowedPackages": ["@asha/contracts", "@asha/runtime-bridge"],
+    "allowedPackages": [
+      "@asha/contracts",
+      "@asha/runtime-bridge",
+      "@asha/devtools",
+      "@asha/game-workspace"
+    ],
     "unstableDemoPackages": ["@asha/renderer-three"],
     "forbiddenPackages": [
       "@asha/native-bridge",
@@ -9,7 +14,6 @@
       "@asha/app",
       "@asha/electron-main",
       "@asha/ui-dom",
-      "@asha/devtools",
       "@asha/policy-core",
       "@asha/policy-examples",
       "@asha/script-host",
@@ -38,5 +42,5 @@
       "ts/packages/contracts/src/generated"
     ]
   },
-  "remediation": "Use @asha/runtime-bridge or @asha/contracts through their public package exports. If the public facade cannot express the demo need, file an ASHA engine feature request or approved temporary adapter request instead of importing internals."
+  "remediation": "Use approved ASHA public package roots through their package exports. If the public facade cannot express the demo need, file an ASHA engine feature request or approved temporary adapter request instead of importing internals."
 }

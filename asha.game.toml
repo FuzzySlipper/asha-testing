@@ -1,0 +1,29 @@
+[asha]
+engine_version = "0.1.0"
+contracts_version = "0.1.0"
+runtime_bridge_version = "0.1.0"
+devtools_protocol_version = "devtools-protocol.v0"
+publish_artifact_format_version = "publish-artifact.v0"
+engine_source = "../asha"
+
+[workspace]
+scene_roots = ["scenes"]
+asset_roots = ["assets"]
+replay_roots = ["replays"]
+catalog_packages = ["packages/game-catalogs"]
+policy_packages = ["packages/game-policy"]
+
+[runtime]
+dev_command = "npm run conformance"
+devtools_endpoint = "ws://127.0.0.1:7391"
+wasm_or_native_entry = "harness/conformance/fixtures/minimal-world.json"
+
+[studio]
+workspace_mode = true
+attach_enabled = true
+allowed_source_writes = ["scenes", "assets", "packages/game-catalogs", "packages/game-policy"]
+
+[publish]
+command = "npm run conformance"
+artifact_dir = "harness/out"
+verify_command = "npm run conformance"

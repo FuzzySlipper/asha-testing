@@ -3,11 +3,17 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { inflateSync } from 'node:zlib';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import '@asha/contracts';
+import {
+  parseAshaGameManifestToml,
+  resolveAshaGameAssetForDev,
+  validateAshaGameAssetCatalog,
+} from '@asha/game-workspace';
 import {
   RuntimeBridgeError,
   STABLE_OPERATION_COUNT,
@@ -18,6 +24,9 @@ import {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturePath = path.join(repoRoot, 'harness/conformance/fixtures/minimal-world.json');
+const manifestPath = path.join(repoRoot, 'asha.game.toml');
+const catalogPath = path.join(repoRoot, 'packages/game-catalogs/catalog.json');
+const scenePath = path.join(repoRoot, 'scenes/minimal.scene.json');
 const contractsCompatibilityPath = path.join(repoRoot, 'node_modules/@asha/contracts/compatibility.json');
 const runtimeCompatibilityPath = path.join(repoRoot, 'node_modules/@asha/runtime-bridge/compatibility.json');
 const outDir = path.join(repoRoot, 'harness/out/conformance/latest');
@@ -512,6 +521,19 @@ async function collectAgoraEvidence({ ashaSource, demoSource, projectionHash, st
 }
 
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
+const manifestResult = parseAshaGameManifestToml(await readFile(manifestPath, 'utf8'));
+assert.equal(manifestResult.ok, true, manifestResult.ok ? '' : JSON.stringify(manifestResult.diagnostics));
+const catalog = JSON.parse(await readFile(catalogPath, 'utf8'));
+const catalogValidation = validateAshaGameAssetCatalog(
+  catalog,
+  manifestResult.manifest,
+  (assetPath) => existsSync(path.join(repoRoot, assetPath)),
+);
+assert.equal(catalogValidation.ok, true, catalogValidation.ok ? '' : JSON.stringify(catalogValidation.diagnostics));
+const sceneSource = JSON.parse(await readFile(scenePath, 'utf8'));
+assert.equal(sceneSource.sceneId, fixture.sceneId);
+const assetResolutions = sceneSource.catalogAssetIds.map((assetId) => resolveAshaGameAssetForDev(catalogValidation.catalog, assetId));
+assert.equal(assetResolutions.every((resolution) => resolution !== null), true);
 const ashaSource = readSource(path.resolve(repoRoot, '../asha'), 'asha');
 const demoSource = readSource(repoRoot, 'asha-demo');
 const compatibility = {
@@ -547,6 +569,8 @@ const nativeAuthority = classifyNativeAvailability(fixture);
 const workflowEvidence = {
   engineHandle,
   fixture,
+  sceneSource,
+  assetResolutions,
   compatibility,
   ashaSource,
   demoSource,
@@ -611,13 +635,19 @@ const artifact = {
   repo: demoSource,
   ashaSource,
   compatibility,
-  publicImports: ['@asha/contracts', '@asha/runtime-bridge'],
+  publicImports: ['@asha/contracts', '@asha/game-workspace', '@asha/runtime-bridge'],
   runtime: {
     mode: 'mock-public-facade-with-native-probe',
     nativeMode: nativeAuthority.mode,
     stableOperationCount: STABLE_OPERATION_COUNT,
   },
   workflow: {
+    scene: {
+      sceneId: sceneSource.sceneId,
+      name: sceneSource.name,
+      catalogAssetIds: sceneSource.catalogAssetIds,
+      assetResolutions,
+    },
     loadedWorld: composition.loadedWorld,
     commandResult,
     stepResult,
@@ -644,6 +674,8 @@ const artifact = {
   },
   artifacts: {
     fixture: path.relative(repoRoot, fixturePath),
+    scene: path.relative(repoRoot, scenePath),
+    catalog: path.relative(repoRoot, catalogPath),
     stateHash: stateHashValue,
   },
   boundaryCheck,

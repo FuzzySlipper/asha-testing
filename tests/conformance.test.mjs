@@ -21,6 +21,10 @@ test('public boundary conformance harness emits deterministic artifact metadata'
   assert.equal(artifact.schemaVersion, 2);
   assert.equal(artifact.runtime.mode, 'mock-public-facade-with-native-probe');
   assert.equal(artifact.workflow.loadedWorld, 1001);
+  assert.equal(artifact.workflow.scene.sceneId, 1001);
+  assert.equal(artifact.workflow.scene.name, 'ASHA Demo Minimal Cube');
+  assert.deepEqual(artifact.workflow.scene.catalogAssetIds, ['mesh.demo-cube']);
+  assert.equal(artifact.workflow.scene.assetResolutions[0].sourcePath, 'assets/meshes/demo-cube.mesh.json');
   assert.deepEqual(artifact.workflow.commandResult, {
     accepted: 1,
     rejected: 0,
@@ -32,7 +36,7 @@ test('public boundary conformance harness emits deterministic artifact metadata'
   assert.match(artifact.artifacts.stateHash, /^sha256:[0-9a-f]{64}$/);
   assert.equal(artifact.boundaryCheck.command, 'npm run check:boundary');
   assert.equal(artifact.boundaryCheck.status, 'passed');
-  assert.deepEqual(artifact.publicImports, ['@asha/contracts', '@asha/runtime-bridge']);
+  assert.deepEqual(artifact.publicImports, ['@asha/contracts', '@asha/game-workspace', '@asha/runtime-bridge']);
 
   assert.equal(artifact.compatibility.contracts.compatibilityVersion, 'contracts.v0');
   assert.equal(artifact.compatibility.runtimeBridge.compatibilityVersion, 'runtime-bridge.v0');

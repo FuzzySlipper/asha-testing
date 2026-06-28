@@ -9,6 +9,9 @@
     "camera:agora-control": "node scripts/run-camera-agora-control.mjs",
     "voxel:interaction": "node scripts/run-voxel-interaction.mjs",
     "check:boundary": "node scripts/check-boundary.mjs",
+    "check:assets": "node scripts/check-assets.mjs",
+    "check:manifest": "node scripts/check-manifest.mjs",
+    "check:public-artifacts": "node scripts/check-public-artifacts.mjs",
     "ci": "npm test",
     "conformance": "node scripts/run-conformance.mjs",
     "conformance:agora": "ASHA_DEMO_AGORA_EVIDENCE=live node scripts/run-conformance.mjs",
@@ -16,6 +19,7 @@
   },
   "dependencies": {
     "@asha/contracts": "file:../asha/ts/packages/contracts",
+    "@asha/game-workspace": "file:../asha/ts/packages/game-workspace",
     "@asha/runtime-bridge": "file:../asha/ts/packages/runtime-bridge"
   }
 }
