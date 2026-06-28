@@ -11,6 +11,7 @@ const outDir = path.join(repoRoot, 'harness/out/publish-evidence/latest');
 const evidencePath = path.join(outDir, 'index.json');
 const publishArtifactPath = path.join(repoRoot, 'harness/out/publish/latest/index.json');
 const publishSmokePath = path.join(repoRoot, 'harness/out/publish-smoke/latest/index.json');
+const publishRunSmokePath = path.join(repoRoot, 'harness/out/publish-run-smoke/latest/index.json');
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
@@ -64,18 +65,25 @@ const readback = run(process.execPath, ['scripts/check-publish-artifact.mjs']);
 const readbackSummary = parseJsonStdout(readback);
 const smokeRun = run(process.execPath, ['scripts/run-publish-smoke.mjs']);
 requirePassed(smokeRun);
+const runSmoke = run('npm', ['run', 'publish:run-smoke']);
+requirePassed(runSmoke);
 
 const publishArtifact = await readJsonWithHash(publishArtifactPath);
 const publishSmoke = await readJsonWithHash(publishSmokePath);
+const publishRunSmoke = await readJsonWithHash(publishRunSmokePath);
 
 assert.equal(publishArtifact.json.artifactHash, readbackSummary.artifactHash);
 assert.equal(publishSmoke.json.readback.artifactHash, readbackSummary.artifactHash);
 assert.equal(publishSmoke.json.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
 assert.equal(publishArtifact.json.compiledAssets.length, readbackSummary.compiledAssetCount);
+assert.equal(publishRunSmoke.json.artifactKind, 'asha_demo_publish_run_smoke');
+assert.equal(publishRunSmoke.json.runtime.runtimeMode, 'reference');
+assert.equal(publishRunSmoke.json.commandProof.acceptedCommand.status, 'accepted');
+assert.equal(publishRunSmoke.json.commandProof.rejectedCommand.status, 'rejected');
 
 const evidenceBody = {
   evidenceKind: 'asha_demo_publish_evidence_manifest',
-  evidenceVersion: 'publish-evidence.v0',
+  evidenceVersion: 'publish-evidence.v1',
   generatedAt: 'deterministic-as-structure-only',
   publishArtifact: {
     path: publishArtifact.path,
@@ -85,6 +93,11 @@ const evidenceBody = {
     artifactVersion: publishArtifact.json.artifactVersion,
     compiledAssetCount: publishArtifact.json.compiledAssets.length,
     publishAssetCount: publishArtifact.json.publishAssets.entries.length,
+    runnableTarget: publishArtifact.json.runnableArtifact.target,
+    runnableEntrypointPath: publishArtifact.json.runnableArtifact.entrypointPath,
+    runnableEntrypointHash: publishArtifact.json.runnableArtifact.entrypointHash,
+    resourcePackManifestPath: publishArtifact.json.resourcePack.manifestPath,
+    resourcePackManifestHash: publishArtifact.json.resourcePack.manifestHash,
   },
   publishSmoke: {
     path: publishSmoke.path,
@@ -92,14 +105,30 @@ const evidenceBody = {
     checks: publishSmoke.json.checks,
     readback: publishSmoke.json.readback,
   },
+  publishRunSmoke: {
+    path: publishRunSmoke.path,
+    fileHash: publishRunSmoke.hash,
+    runnableArtifact: publishRunSmoke.json.runnableArtifact,
+    runtime: publishRunSmoke.json.runtime,
+    projection: publishRunSmoke.json.projection,
+    commandProof: publishRunSmoke.json.commandProof,
+    resolvedResourceCount: publishRunSmoke.json.resolvedResources.length,
+    checks: publishRunSmoke.json.checks,
+  },
   commands: {
     build,
     readback,
     smoke: smokeRun,
+    runSmoke,
   },
   validations: [
     'publish_artifact_hash_matches_readback',
     'publish_smoke_references_publish_artifact',
+    'publish_run_smoke_references_runnable_artifact',
+    'runnable_entrypoint_hash_recorded',
+    'packed_resource_manifest_hash_recorded',
+    'runtime_projection_readback_present',
+    'packaged_command_proof_present',
     'compiled_asset_count_matches_readback',
     'studio_dev_only_dependency_guard_passed',
   ],

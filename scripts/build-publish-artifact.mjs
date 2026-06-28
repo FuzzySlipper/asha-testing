@@ -158,6 +158,11 @@ const runtimeMetadata = {
   schemaVersion: 1,
   runtimeMode: 'reference',
   launcherName: 'reference-game-runtime-launcher',
+  world: {
+    bundleSchemaVersion: Number(sceneFiles[0]?.json.schemaVersion ?? 1),
+    protocolVersion: 1,
+    sceneId: Number(sceneFiles[0]?.json.sceneId ?? 0),
+  },
   sceneIds: sceneFiles.map((scene) => scene.json.sceneId),
   catalogAssetIds: [...new Set(sceneFiles.flatMap((scene) => scene.json.catalogAssetIds ?? []))].sort(),
   nonClaims: [

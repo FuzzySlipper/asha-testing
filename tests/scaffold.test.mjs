@@ -641,9 +641,16 @@ test('publish artifact smoke verifies hashes payloads and writes readback eviden
   assert.equal(smoke.readback.status, 'ok');
   assert.equal(smoke.readback.compiledAssetCount, 3);
   assert.equal(smoke.readback.publishAssetCount, 3);
+  assert.equal(smoke.readback.packedResources.length, 3);
+  assert.equal(smoke.readback.packedResources.at(0)?.assetId, 'mesh.demo-cube');
+  assert.match(smoke.readback.packedResources.at(0)?.packedHash, /^sha256:/);
+  assert.ok(smoke.readback.dependencyGuard.inspectedRunnableFiles.includes('harness/out/publish/runnable/latest/index.html'));
   assert.equal(smoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
   assert.ok(smoke.checks.includes('artifact_hash_recomputed'));
   assert.ok(smoke.checks.includes('compiled_assets_match_sources'));
+  assert.ok(smoke.checks.includes('packed_resources_match_publish_profile'));
+  assert.ok(smoke.checks.includes('no_dev_local_resource_reads'));
+  assert.ok(smoke.checks.includes('runnable_dependency_guard_passed'));
 });
 
 test('publish artifact checker rejects dev-only Studio leakage', async () => {
@@ -685,6 +692,99 @@ test('publish artifact checker rejects missing packed resource files', async () 
   assert.match(check.stderr + check.stdout, /demo-cube\.mesh\.json/);
 });
 
+test('publish artifact checker rejects runnable resources that read dev-local source roots', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const manifestUrl = new URL('../harness/out/publish/runnable/latest/resources/manifest.json', import.meta.url);
+  const original = await readFile(manifestUrl, 'utf8');
+  try {
+    const manifest = JSON.parse(original);
+    manifest.entries[0].path = 'assets/meshes/demo-cube.mesh.json';
+    await writeFile(manifestUrl, `${JSON.stringify(manifest, null, 2)}\n`);
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /dev-local source root/);
+  } finally {
+    await writeFile(manifestUrl, original);
+  }
+});
+
+test('publish artifact checker rejects forbidden markers inside runnable files', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const entrypointUrl = new URL('../harness/out/publish/runnable/latest/index.html', import.meta.url);
+  const original = await readFile(entrypointUrl, 'utf8');
+  try {
+    await writeFile(entrypointUrl, `${original}\n<!-- ../asha-studio forbidden marker -->\n`);
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /forbidden fragment/);
+  } finally {
+    await writeFile(entrypointUrl, original);
+  }
+});
+
+test('publish runnable artifact smoke starts without a dev server', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const result = spawnSync('npm', ['run', 'publish:run-smoke'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/publish-run-smoke\/latest\/index\.json/);
+  const smoke = JSON.parse(await readFile(new URL('../harness/out/publish-run-smoke/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(smoke.artifactKind, 'asha_demo_publish_run_smoke');
+  assert.equal(smoke.runtime.runtimeMode, 'reference');
+  assert.equal(smoke.resolvedResources.length, 3);
+  assert.match(smoke.projection.worldHash, /^reference-world:/);
+  assert.equal(smoke.commandProof.acceptedCommand.status, 'accepted');
+  assert.notEqual(
+    smoke.commandProof.acceptedCommand.authorityHashBefore,
+    smoke.commandProof.acceptedCommand.authorityHashAfter,
+  );
+  assert.equal(smoke.commandProof.rejectedCommand.status, 'rejected');
+  assert.equal(
+    smoke.commandProof.rejectedCommand.authorityHashBefore,
+    smoke.commandProof.rejectedCommand.authorityHashAfter,
+  );
+  assert.equal(smoke.commandProof.rejectedCommand.diagnostics[0].code, 'command_rejected');
+  assert.ok(smoke.checks.includes('no_devtools_endpoint_required'));
+  assert.ok(smoke.checks.includes('packaged_runtime_accepted_command_mutated_projection'));
+});
+
+test('publish runnable artifact smoke fails when entrypoint is missing', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const entrypointUrl = new URL('../harness/out/publish/runnable/latest/index.html', import.meta.url);
+  await rm(entrypointUrl, { force: true });
+  const result = spawnSync(process.execPath, ['scripts/run-publish-run-smoke.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stderr + result.stdout, /index\.html|ENOENT/);
+});
+
 test('publish evidence manifest validates build smoke and dependency guard correlation', async () => {
   await rm(new URL('../harness/out/publish-evidence/', import.meta.url), { recursive: true, force: true });
   const result = spawnSync(process.execPath, ['scripts/generate-publish-evidence.mjs'], {
@@ -695,12 +795,17 @@ test('publish evidence manifest validates build smoke and dependency guard corre
   assert.match(result.stdout, /wrote harness\/out\/publish-evidence\/latest\/index\.json/);
   const evidence = JSON.parse(await readFile(new URL('../harness/out/publish-evidence/latest/index.json', import.meta.url), 'utf8'));
   assert.equal(evidence.evidenceKind, 'asha_demo_publish_evidence_manifest');
-  assert.equal(evidence.evidenceVersion, 'publish-evidence.v0');
+  assert.equal(evidence.evidenceVersion, 'publish-evidence.v1');
   assert.equal(evidence.publishArtifact.artifactVersion, 'publish-artifact.v0');
   assert.equal(evidence.publishArtifact.compiledAssetCount, 3);
+  assert.equal(evidence.publishArtifact.runnableTarget, 'asha-demo-static-reference.v1');
   assert.equal(evidence.publishArtifact.artifactHash, evidence.publishSmoke.readback.artifactHash);
   assert.equal(evidence.publishSmoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
+  assert.equal(evidence.publishRunSmoke.runtime.runtimeMode, 'reference');
+  assert.equal(evidence.publishRunSmoke.commandProof.acceptedCommand.status, 'accepted');
   assert.ok(evidence.validations.includes('publish_artifact_hash_matches_readback'));
+  assert.ok(evidence.validations.includes('runtime_projection_readback_present'));
+  assert.ok(evidence.validations.includes('packaged_command_proof_present'));
   assert.ok(evidence.validations.includes('studio_dev_only_dependency_guard_passed'));
   assert.deepEqual(evidence.nonClaims, [
     'not_native_runtime_authority',
@@ -710,6 +815,35 @@ test('publish evidence manifest validates build smoke and dependency guard corre
   ]);
   assert.match(evidence.evidenceId, /^asha-demo-publish-evidence:sha256:/);
   assert.match(evidence.evidenceHash, /^sha256:/);
+  const check = spawnSync('npm', ['run', 'publish:evidence-check'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(check.status, 0, check.stdout + check.stderr);
+  assert.match(check.stdout, /publish evidence check: OK/);
+});
+
+test('publish evidence readback fails closed on missing launch projection', async () => {
+  const generate = spawnSync(process.execPath, ['scripts/generate-publish-evidence.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(generate.status, 0, generate.stdout + generate.stderr);
+  const evidenceUrl = new URL('../harness/out/publish-evidence/latest/index.json', import.meta.url);
+  const badUrl = new URL('../harness/out/publish-evidence/latest/bad-missing-projection.json', import.meta.url);
+  const evidence = JSON.parse(await readFile(evidenceUrl, 'utf8'));
+  delete evidence.publishRunSmoke.projection;
+  await writeFile(badUrl, `${JSON.stringify(evidence, null, 2)}\n`);
+  try {
+    const check = spawnSync(process.execPath, ['scripts/check-publish-evidence.mjs', 'harness/out/publish-evidence/latest/bad-missing-projection.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /projection|readback/);
+  } finally {
+    await rm(badUrl, { force: true });
+  }
 });
 
 test('aggregate game workflow verification gates dev Studio attach and publish', async () => {

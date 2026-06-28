@@ -38,6 +38,16 @@ const summary = parseJsonStdout(readback);
 assert.equal(summary.status, 'ok');
 assert.equal(summary.compiledAssetCount, summary.publishAssetCount);
 assert.ok(summary.artifactHash.startsWith('sha256:'));
+assert.equal(summary.packedResourceProfile.outputDir, 'publish_resource_profile.output_dir');
+assert.equal(summary.packedResourceProfile.resourceManifestPath, 'harness/out/publish/runnable/latest/resources/manifest.json');
+assert.equal(summary.packedResources.length, summary.publishAssetCount);
+assert.ok(summary.dependencyGuard.inspectedRunnableFiles.includes('harness/out/publish/runnable/latest/index.html'));
+for (const resource of summary.packedResources) {
+  assert.ok(resource.outputKey.length > 0);
+  assert.match(resource.sourceHash, /^sha256:/);
+  assert.match(resource.packedHash, /^sha256:/);
+  assert.match(resource.runnableHash, /^sha256:/);
+}
 
 const smoke = {
   schemaVersion: 1,
@@ -48,6 +58,9 @@ const smoke = {
     'publish_artifact_built',
     'artifact_hash_recomputed',
     'compiled_assets_match_sources',
+    'packed_resources_match_publish_profile',
+    'no_dev_local_resource_reads',
+    'runnable_dependency_guard_passed',
     'non_claims_preserved',
   ],
 };
