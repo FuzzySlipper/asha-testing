@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const repoRoot = new URL('..', import.meta.url);
@@ -10,6 +10,7 @@ const repoRoot = new URL('..', import.meta.url);
 test('scaffold depends only on Tier 1 ASHA public TypeScript surfaces', () => {
   assert.deepEqual(packageJson.dependencies, {
     '@asha/contracts': 'file:../asha/ts/packages/contracts',
+    '@asha/devtools': 'file:../asha/ts/packages/devtools',
     '@asha/game-workspace': 'file:../asha/ts/packages/game-workspace',
     '@asha/runtime-bridge': 'file:../asha/ts/packages/runtime-bridge',
   });
@@ -238,4 +239,108 @@ test('asset catalog checker validates the real demo asset and dev resolution', (
   });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /asset catalog check: OK/);
+});
+
+test('dev runtime exposes typed devtools endpoint for a separate headless client', async () => {
+  const runtime = spawn(process.execPath, ['scripts/dev-runtime.mjs', '--port', '0'], {
+    cwd: repoRoot,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  runtime.stdout.setEncoding('utf8');
+  runtime.stderr.setEncoding('utf8');
+  runtime.stdout.on('data', (chunk) => {
+    stdout += chunk;
+  });
+  runtime.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+
+  try {
+    const listening = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`dev runtime did not start\n${stdout}\n${stderr}`)), 5000);
+      runtime.stdout.on('data', () => {
+        const firstLine = stdout.trim().split('\n')[0];
+        if (firstLine) {
+          clearTimeout(timer);
+          resolve(JSON.parse(firstLine));
+        }
+      });
+      runtime.on('exit', (code, signal) => {
+        clearTimeout(timer);
+        reject(new Error(`dev runtime exited before listening: code=${code} signal=${signal}\n${stdout}\n${stderr}`));
+      });
+    });
+    assert.equal(listening.status, 'listening');
+    assert.equal(listening.scene.name, 'ASHA Demo Minimal Cube');
+
+    const client = spawnSync(process.execPath, ['scripts/check-devtools-endpoint.mjs', listening.endpoint], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.equal(client.status, 0, client.stdout + client.stderr);
+    const smoke = JSON.parse(client.stdout);
+    assert.equal(smoke.status, 'ok');
+    assert.equal(smoke.projection.worldHash, 'world:1001:1001');
+    assert.equal(smoke.command.status, 'accepted');
+    assert.equal(smoke.afterProjection.worldHash, 'world:1001:1001:commands:1');
+  } finally {
+    runtime.kill('SIGTERM');
+  }
+});
+
+test('headless dev smoke starts runtime, reads endpoint, and writes evidence', async () => {
+  await rm(new URL('../harness/out/dev-smoke/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync(process.execPath, ['scripts/run-dev-smoke.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/dev-smoke\/latest\/index\.json/);
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/dev-smoke/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.scene.sceneId, 1001);
+  assert.equal(artifact.scene.name, 'ASHA Demo Minimal Cube');
+  assert.equal(artifact.client.status, 'ok');
+  assert.equal(artifact.client.projection.worldHash, 'world:1001:1001');
+  assert.equal(artifact.client.command.status, 'accepted');
+  assert.equal(artifact.client.command.authorityHashAfter, 'authority:1001:commands:1');
+  assert.equal(artifact.client.afterProjection.worldHash, 'world:1001:1001:commands:1');
+  assert.equal(artifact.shutdown.exitCode, 0);
+});
+
+test('publish artifact build writes compiled scene catalog and asset payloads', async () => {
+  await rm(new URL('../harness/out/publish/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/publish\/latest\/index\.json/);
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/publish/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_publish_artifact');
+  assert.equal(artifact.artifactVersion, 'publish-artifact.v0');
+  assert.equal(artifact.game.id, 'asha-demo');
+  assert.equal(artifact.commands.publish, 'npm run publish:artifact');
+  assert.equal(artifact.commands.verify, 'npm run conformance');
+  assert.equal(artifact.scenes.at(0)?.scene.name, 'ASHA Demo Minimal Cube');
+  assert.equal(artifact.publishAssets.entries.at(0)?.assetId, 'mesh.demo-cube');
+  assert.equal(artifact.compiledAssets.at(0)?.outputKey, 'meshes/demo-cube.mesh.json');
+  assert.equal(artifact.compiledAssets.at(0)?.payload.kind, 'inline-static-mesh');
+  assert.deepEqual(artifact.nonClaims, [
+    'not_native_runtime_authority',
+    'not_hardware_gpu_evidence',
+    'not_performance_evidence',
+    'not_store_submission',
+  ]);
+  assert.match(artifact.artifactHash, /^sha256:/);
+});
+
+test('headless devtools client fails when endpoint is absent', () => {
+  const result = spawnSync(process.execPath, ['scripts/check-devtools-endpoint.mjs', 'ws://127.0.0.1:1'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+  assert.notEqual(result.status, 0);
 });

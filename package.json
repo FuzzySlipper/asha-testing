@@ -15,10 +15,15 @@
     "ci": "npm test",
     "conformance": "node scripts/run-conformance.mjs",
     "conformance:agora": "ASHA_DEMO_AGORA_EVIDENCE=live node scripts/run-conformance.mjs",
+    "dev": "node scripts/dev-runtime.mjs",
+    "dev:smoke": "node scripts/run-dev-smoke.mjs",
+    "devtools:smoke": "node scripts/check-devtools-endpoint.mjs",
+    "publish:artifact": "node scripts/build-publish-artifact.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs && npm run check:boundary"
   },
   "dependencies": {
     "@asha/contracts": "file:../asha/ts/packages/contracts",
+    "@asha/devtools": "file:../asha/ts/packages/devtools",
     "@asha/game-workspace": "file:../asha/ts/packages/game-workspace",
     "@asha/runtime-bridge": "file:../asha/ts/packages/runtime-bridge"
   }

@@ -14,7 +14,7 @@ catalog_packages = ["packages/game-catalogs"]
 policy_packages = ["packages/game-policy"]
 
 [runtime]
-dev_command = "npm run conformance"
+dev_command = "npm run dev"
 devtools_endpoint = "ws://127.0.0.1:7391"
 wasm_or_native_entry = "harness/conformance/fixtures/minimal-world.json"
 
@@ -24,6 +24,6 @@ attach_enabled = true
 allowed_source_writes = ["scenes", "assets", "packages/game-catalogs", "packages/game-policy"]
 
 [publish]
-command = "npm run conformance"
+command = "npm run publish:artifact"
 artifact_dir = "harness/out"
 verify_command = "npm run conformance"
