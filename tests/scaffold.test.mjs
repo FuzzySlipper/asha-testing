@@ -336,6 +336,121 @@ test('publish artifact build writes compiled scene catalog and asset payloads', 
   assert.match(artifact.artifactHash, /^sha256:/);
 });
 
+test('publish artifact smoke verifies hashes payloads and writes readback evidence', async () => {
+  await rm(new URL('../harness/out/publish-smoke/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync(process.execPath, ['scripts/run-publish-smoke.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/publish-smoke\/latest\/index\.json/);
+  const smoke = JSON.parse(await readFile(new URL('../harness/out/publish-smoke/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(smoke.build.status, 'passed');
+  assert.equal(smoke.readback.status, 'ok');
+  assert.equal(smoke.readback.compiledAssetCount, 1);
+  assert.equal(smoke.readback.publishAssetCount, 1);
+  assert.equal(smoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
+  assert.ok(smoke.checks.includes('artifact_hash_recomputed'));
+  assert.ok(smoke.checks.includes('compiled_assets_match_sources'));
+});
+
+test('publish artifact checker rejects dev-only Studio leakage', async () => {
+  const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const original = await readFile(artifactUrl, 'utf8');
+  try {
+    const artifact = JSON.parse(original);
+    artifact.debugOnlyStudioProbe = '../asha-studio';
+    await writeFile(artifactUrl, `${JSON.stringify(artifact, null, 2)}\n`);
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0);
+    assert.match(check.stderr + check.stdout, /dev-only Studio\/attach fragment/);
+  } finally {
+    await writeFile(artifactUrl, original);
+  }
+});
+
+test('publish evidence manifest validates build smoke and dependency guard correlation', async () => {
+  await rm(new URL('../harness/out/publish-evidence/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync(process.execPath, ['scripts/generate-publish-evidence.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/publish-evidence\/latest\/index\.json/);
+  const evidence = JSON.parse(await readFile(new URL('../harness/out/publish-evidence/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(evidence.evidenceKind, 'asha_demo_publish_evidence_manifest');
+  assert.equal(evidence.evidenceVersion, 'publish-evidence.v0');
+  assert.equal(evidence.publishArtifact.artifactVersion, 'publish-artifact.v0');
+  assert.equal(evidence.publishArtifact.compiledAssetCount, 1);
+  assert.equal(evidence.publishArtifact.artifactHash, evidence.publishSmoke.readback.artifactHash);
+  assert.equal(evidence.publishSmoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
+  assert.ok(evidence.validations.includes('publish_artifact_hash_matches_readback'));
+  assert.ok(evidence.validations.includes('studio_dev_only_dependency_guard_passed'));
+  assert.deepEqual(evidence.nonClaims, [
+    'not_native_runtime_authority',
+    'not_hardware_gpu_evidence',
+    'not_performance_evidence',
+    'not_store_submission',
+  ]);
+  assert.match(evidence.evidenceId, /^asha-demo-publish-evidence:sha256:/);
+  assert.match(evidence.evidenceHash, /^sha256:/);
+});
+
+test('aggregate game workflow verification gates dev Studio attach and publish', async () => {
+  await rm(new URL('../harness/out/game-workflow/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync(process.execPath, ['scripts/verify-game-workflow.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 90000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/game-workflow\/latest\/index\.json/);
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/game-workflow/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_game_workflow_verification');
+  assert.equal(artifact.commands.devSmoke.status, 'passed');
+  assert.equal(artifact.commands.publishEvidence.status, 'passed');
+  assert.equal(artifact.commands.studioTests.status, 'passed');
+  assert.equal(artifact.commands.studioBoundaries.status, 'passed');
+  assert.equal(artifact.artifacts.devSmoke.worldHash, 'world:1001:1001');
+  assert.equal(artifact.artifacts.devSmoke.afterCommandWorldHash, 'world:1001:1001:commands:1');
+  assert.match(artifact.artifacts.publishEvidence.evidenceHash, /^sha256:/);
+  assert.ok(artifact.validations.includes('devtools_attach_smoke_passed'));
+  assert.ok(artifact.validations.includes('studio_attach_tests_passed'));
+  assert.ok(artifact.validations.includes('publish_evidence_passed'));
+  assert.match(artifact.artifactId, /^asha-demo-game-workflow:sha256:/);
+});
+
+test('publish artifact checker fails closed on stale artifact hashes', async () => {
+  const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const original = await readFile(artifactUrl, 'utf8');
+  try {
+    const artifact = JSON.parse(original);
+    artifact.artifactHash = 'sha256:stale';
+    await writeFile(artifactUrl, `${JSON.stringify(artifact, null, 2)}\n`);
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0);
+    assert.match(check.stderr + check.stdout, /sha256:stale/);
+  } finally {
+    await writeFile(artifactUrl, original);
+  }
+});
+
 test('headless devtools client fails when endpoint is absent', () => {
   const result = spawnSync(process.execPath, ['scripts/check-devtools-endpoint.mjs', 'ws://127.0.0.1:1'], {
     cwd: repoRoot,

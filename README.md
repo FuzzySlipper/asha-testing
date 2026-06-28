@@ -49,11 +49,27 @@ Then run:
 npm test
 npm run conformance
 npm run camera:mover
+npm run dev:smoke
+npm run publish:evidence
 npm run check:boundary
 npm run ci
 ```
 
 `npm run ci` is also wired into `.github/workflows/boundary.yml`. The workflow checks out `asha` beside `asha-demo` so the local `file:../asha/...` public package dependencies resolve before running the conformance suite. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
+
+## Game workspace workflow
+
+The current game-shaped workflow is documented in `docs/game-workflow.md`.
+
+Main commands:
+
+- `npm run check:manifest` validates `asha.game.toml`;
+- `npm run dev:smoke` starts the typed devtools runtime and verifies Studio-equivalent attach/projection/telemetry/command flow;
+- `npm run publish:artifact` writes `harness/out/publish/latest/index.json`;
+- `npm run publish:check` recomputes publish hashes and rejects dev-only Studio/attach leakage;
+- `npm run publish:smoke` writes publish smoke evidence;
+- `npm run publish:evidence` writes the validated publish evidence manifest;
+- `npm run verify:workflow` writes the aggregate dev plus Studio attach plus publish verification artifact.
 
 ## Conformance harness
 

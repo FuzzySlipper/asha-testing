@@ -19,6 +19,10 @@
     "dev:smoke": "node scripts/run-dev-smoke.mjs",
     "devtools:smoke": "node scripts/check-devtools-endpoint.mjs",
     "publish:artifact": "node scripts/build-publish-artifact.mjs",
+    "publish:check": "node scripts/check-publish-artifact.mjs",
+    "publish:evidence": "node scripts/generate-publish-evidence.mjs",
+    "publish:smoke": "node scripts/run-publish-smoke.mjs",
+    "verify:workflow": "node scripts/verify-game-workflow.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs && npm run check:boundary"
   },
   "dependencies": {
