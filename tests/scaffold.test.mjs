@@ -4,6 +4,11 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
+import {
+  buildAshaAuthoringPersistenceContract,
+  parseAshaGameManifestToml,
+  resolveAshaAuthoringWriteTarget,
+} from '@asha/game-workspace';
 
 const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const repoRoot = new URL('..', import.meta.url);
@@ -1420,6 +1425,247 @@ test('runtime-backed publish target V2 doc pins staged backend layout and non-cl
   assert.match(doc, /not_private_runtime_transport/);
   assert.match(doc, /WASM remains a deferred target/);
   assert.match(workflow, /runtime-backed-publish-target-v2\.md/);
+});
+
+test('M0 demo proof inventory records current authoring runtime and browser seams', async () => {
+  const doc = await readFile(new URL('../docs/demo-proof-m0-inventory.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3735`/);
+  assert.match(doc, /parseAshaGameManifestToml/);
+  assert.match(doc, /validateAshaGameAssetCatalog/);
+  assert.match(doc, /StudioSceneObjectSnapshot/);
+  assert.match(doc, /createNativeGameRuntimeLauncher/);
+  assert.match(doc, /pnpm run proof:v2-live-backend-evidence/);
+  assert.match(doc, /npm run publish:backend-run-smoke/);
+  assert.match(doc, /npm run proof:v2-index/);
+  assert.match(doc, /Browser interaction proof prototypes/);
+  assert.match(doc, /Scene and catalog save formats/);
+  assert.match(doc, /Do not add arbitrary JSON command hatches/);
+  assert.match(doc, /not infer WASM, hardware GPU, performance, store submission, installer, or\s+signing readiness/);
+});
+
+test('authoring save contract pins source formats write scope and readback requirements', async () => {
+  const doc = await readFile(new URL('../docs/authoring-save-contract.md', import.meta.url), 'utf8');
+  const inventory = await readFile(new URL('../docs/demo-proof-m0-inventory.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3736`/);
+  assert.match(doc, /scenes\/\*\.scene\.json/);
+  assert.match(doc, /packages\/game-catalogs\/catalog\.json/);
+  assert.match(doc, /assets\/\*\*/);
+  assert.match(doc, /packages\/game-policy\/\*\*/);
+  assert.match(doc, /allowed_source_writes = \["scenes", "assets", "packages\/game-catalogs", "packages\/game-policy"\]/);
+  assert.match(doc, /contains `\.\.`/);
+  assert.match(doc, /targets `harness\/out`/);
+  assert.match(doc, /validateAshaGameAssetCatalog/);
+  assert.match(doc, /previous file hash or `null`/);
+  assert.match(doc, /next file hash/);
+  assert.match(doc, /deterministic semantic diff summary/);
+  assert.match(doc, /No private Studio asset database/);
+  assert.match(doc, /does not approve:\n\n- a browser runtime writing directly to source roots/);
+  assert.match(inventory, /authoring-save-contract\.md/);
+});
+
+test('authoring public API lanes separate file saves from runtime proposals', async () => {
+  const doc = await readFile(new URL('../docs/authoring-public-api-lanes.md', import.meta.url), 'utf8');
+  const inventory = await readFile(new URL('../docs/demo-proof-m0-inventory.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3737`/);
+  assert.match(doc, /File-authoring APIs are about committed game-owned source files/);
+  assert.match(doc, /Runtime command proposals are about a launched runtime session/);
+  assert.match(doc, /@asha\/game-workspace/);
+  assert.match(doc, /@asha\/runtime-bridge/);
+  assert.match(doc, /asha-studio/);
+  assert.match(doc, /AshaAuthoringSaveRequest/);
+  assert.match(doc, /AshaAuthoringSaveResult/);
+  assert.match(doc, /AshaAuthoringPersistenceContract/);
+  assert.match(doc, /buildAshaAuthoringPersistenceContract/);
+  assert.match(doc, /resolveAshaAuthoringWriteTarget/);
+  assert.match(doc, /authoring\.scene\.save_source/);
+  assert.match(doc, /authoring\.catalog\.save_source/);
+  assert.match(doc, /unsupported_operation/);
+  assert.match(doc, /stale_file_hash/);
+  assert.match(doc, /invalid_schema/);
+  assert.match(doc, /disallowed_path/);
+  assert.match(doc, /private_mutation_path/);
+  assert.match(doc, /Studio sends file-authoring requests to the public authoring API/);
+  assert.match(inventory, /authoring-public-api-lanes\.md/);
+});
+
+test('M1.1 bounded workspace persistence contract is public and fail-closed', async () => {
+  const manifestText = await readFile(new URL('../asha.game.toml', import.meta.url), 'utf8');
+  const saveContract = await readFile(new URL('../docs/authoring-save-contract.md', import.meta.url), 'utf8');
+  const parsed = parseAshaGameManifestToml(manifestText);
+  assert.equal(parsed.ok, true);
+  const manifest = parsed.manifest;
+  const contract = buildAshaAuthoringPersistenceContract(manifest);
+
+  assert.match(saveContract, /authoring-persistence\.v0/);
+  assert.match(saveContract, /public `@asha\/game-workspace` authoring contract/);
+  assert.equal(contract.contractVersion, 'authoring-persistence.v0');
+  assert.deepEqual(contract.writeScopes.map((scope) => scope.operationKind), [
+    'authoring.scene.save_source',
+    'authoring.catalog.save_source',
+    'authoring.asset.save_source',
+    'authoring.policy.save_source',
+  ]);
+  assert.deepEqual(contract.writeScopes.map((scope) => scope.allowedRoots), [
+    ['scenes'],
+    ['packages/game-catalogs'],
+    ['assets'],
+    ['packages/game-policy'],
+  ]);
+  assert.ok(contract.forbiddenRoots.includes('harness/out'));
+  assert.ok(contract.nonClaims.includes('not_repo_crawler'));
+  assert.ok(contract.nonClaims.includes('not_private_asset_database'));
+  assert.ok(contract.diagnostics.some((diagnostic) => diagnostic.code === 'unsupported_operation'));
+
+  const scene = resolveAshaAuthoringWriteTarget(manifest, {
+    operationKind: 'authoring.scene.save_source',
+    relativePath: './scenes/demo.scene.json',
+  });
+  assert.equal(scene.ok, true);
+  assert.equal(scene.normalizedPath, 'scenes/demo.scene.json');
+  assert.equal(scene.format, 'proof-scene-json.v1');
+
+  const catalog = resolveAshaAuthoringWriteTarget(manifest, {
+    operationKind: 'authoring.catalog.save_source',
+    relativePath: 'packages/game-catalogs/catalog.json',
+  });
+  assert.equal(catalog.ok, true);
+  assert.equal(catalog.requiredValidator, 'validateAshaGameAssetCatalog');
+
+  for (const [relativePath, code] of [
+    ['harness/out/generated.scene.json', 'forbidden_generated_path'],
+    ['../asha/private/catalog.json', 'disallowed_path'],
+    ['assets/mesh.txt', 'invalid_extension'],
+    ['assets/@asha/native-bridge/native-bridge.node', 'private_transport_hint'],
+    ['packages/game-policy/rules.json', 'unsupported_operation'],
+  ]) {
+    const result = resolveAshaAuthoringWriteTarget(manifest, {
+      operationKind: relativePath.startsWith('packages/game-policy')
+        ? 'authoring.policy.save_source'
+        : relativePath.startsWith('assets/')
+          ? 'authoring.asset.save_source'
+          : 'authoring.scene.save_source',
+      relativePath,
+    });
+    assert.equal(result.ok, false);
+    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.code === code), `${relativePath} should report ${code}`);
+  }
+});
+
+test('browser interactive proof contract requires real input and typed ASHA readback', async () => {
+  const doc = await readFile(new URL('../docs/browser-interactive-proof-contract.md', import.meta.url), 'utf8');
+  const inventory = await readFile(new URL('../docs/demo-proof-m0-inventory.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3738`/);
+  assert.match(doc, /keyboard events/);
+  assert.match(doc, /mouse or pointer events/);
+  assert.match(doc, /gamepad state/);
+  assert.match(doc, /headless browser automation/);
+  assert.match(doc, /typed public ASHA request/);
+  assert.match(doc, /@asha\/runtime-bridge/);
+  assert.match(doc, /ordered browser event log/);
+  assert.match(doc, /before and after projection/);
+  assert.match(doc, /replay or command evidence/);
+  assert.match(doc, /proof markers exist but no browser input event log exists/);
+  assert.ok(doc.includes(`call(${['methodName', 'json'].join(', ')})`));
+  assert.match(doc, /headless automation mutates page globals directly/);
+  assert.match(doc, /npm run voxel:interaction/);
+  assert.match(inventory, /browser-interactive-proof-contract\.md/);
+});
+
+test('Studio live debug inspector contract pins surfaces freshness and negative smokes', async () => {
+  const doc = await readFile(new URL('../docs/studio-live-debug-inspector-contract.md', import.meta.url), 'utf8');
+  const inventory = await readFile(new URL('../docs/demo-proof-m0-inventory.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3739`/);
+  assert.match(doc, /Scene \| scene id\/hash/);
+  assert.match(doc, /Entity \| selected entity id/);
+  assert.match(doc, /Asset \| catalog asset id/);
+  assert.match(doc, /Runtime \| session id/);
+  assert.match(doc, /Debug command \| command identity/);
+  assert.match(doc, /Telemetry \| sequence id or sample cursor/);
+  assert.match(doc, /attach/);
+  assert.match(doc, /read/);
+  assert.match(doc, /update/);
+  assert.match(doc, /event/);
+  assert.match(doc, /selection\.set_active_entity/);
+  assert.match(doc, /scene\.apply_object_command/);
+  assert.match(doc, /GameRuntimeSession\.proposeCommands/);
+  assert.ok(doc.includes(`call(${['methodName', 'json'].join(', ')})`));
+  assert.match(doc, /missing_live_session/);
+  assert.match(doc, /stale_fixture_readback/);
+  assert.match(doc, /unsupported_debug_command/);
+  assert.match(doc, /private_transport_hint/);
+  assert.match(doc, /pnpm run proof:v2-live-backend-evidence/);
+  assert.match(inventory, /studio-live-debug-inspector-contract\.md/);
+});
+
+test('round-trip evidence contract pins artifact vocabulary hashes and non-claims', async () => {
+  const doc = await readFile(new URL('../docs/round-trip-evidence-contract.md', import.meta.url), 'utf8');
+  const inventory = await readFile(new URL('../docs/demo-proof-m0-inventory.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3740`/);
+  assert.match(doc, /asha_demo_authoring_save_evidence/);
+  assert.match(doc, /harness\/out\/authoring-save\/latest\/index\.json/);
+  assert.match(doc, /asha_demo_browser_interaction_evidence/);
+  assert.match(doc, /asha_demo_studio_live_debug_evidence/);
+  assert.match(doc, /asha_demo_round_trip_evidence/);
+  assert.match(doc, /asha_demo_m0_capstone_verification/);
+  assert.match(doc, /saved file hash/);
+  assert.match(doc, /runtime loaded resource manifest hash/);
+  assert.match(doc, /projection\/world hash/);
+  assert.match(doc, /authority hash/);
+  assert.match(doc, /replay or command evidence hash/);
+  assert.match(doc, /stale child artifact hash/);
+  assert.match(doc, /browser event log missing or marker-only interaction/);
+  assert.match(doc, /Studio live debug readback older than attach\/update/);
+  assert.match(doc, /not_hardware_gpu_evidence/);
+  assert.match(doc, /not_product_readiness/);
+  assert.match(doc, /not_multiplayer_evidence/);
+  assert.match(doc, /not_runtime_den_dependency/);
+  assert.match(inventory, /round-trip-evidence-contract\.md/);
+});
+
+test('M0 contract consolidates proof docs and validates milestone tree handoff', async () => {
+  const doc = await readFile(new URL('../docs/demo-proof-m0-contract.md', import.meta.url), 'utf8');
+  const inventory = await readFile(new URL('../docs/demo-proof-m0-inventory.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3741`/);
+  assert.match(doc, /demo-proof-m0-inventory\.md/);
+  assert.match(doc, /authoring-save-contract\.md/);
+  assert.match(doc, /authoring-public-api-lanes\.md/);
+  assert.match(doc, /browser-interactive-proof-contract\.md/);
+  assert.match(doc, /studio-live-debug-inspector-contract\.md/);
+  assert.match(doc, /round-trip-evidence-contract\.md/);
+  for (const taskId of [3728, 3729, 3730, 3731, 3732, 3733, 3734, 3744, 3783]) {
+    assert.match(doc, new RegExp(`asha#${taskId}`));
+  }
+  assert.match(doc, /M1\.1 Add bounded workspace persistence contract/);
+  assert.match(doc, /no arbitrary JSON command hatch/);
+  assert.match(doc, /no browser marker-only interaction proof/);
+  assert.match(doc, /no stale fixture readback presented as live debug evidence/);
+  assert.match(doc, /npm run verify:workflow:v2/);
+  assert.match(inventory, /demo-proof-m0-contract\.md/);
+});
+
+test('M1 persistence closeout records aggregate proof hashes and non-claims', async () => {
+  const doc = await readFile(new URL('../docs/demo-proof-m1-persistence-closeout.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /Task: `asha#3749`/);
+  assert.match(doc, /studio_persistence_m1_proof/);
+  assert.match(doc, /proof:workspace-open-read/);
+  assert.match(doc, /proof:scene-save-roundtrip/);
+  assert.match(doc, /proof:catalog-save-roundtrip/);
+  assert.match(doc, /proof:persistence-m1/);
+  assert.match(doc, /sha256:902f5cd022e7e46cad230c14812ef93005666e80f1e8fcd1d257cbcbc1e9e776/);
+  assert.match(doc, /studio_workspace_open_read_proof/);
+  assert.match(doc, /studio_scene_save_roundtrip_proof/);
+  assert.match(doc, /studio_catalog_save_roundtrip_proof/);
+  assert.match(doc, /validateAshaGameAssetCatalog/);
+  assert.match(doc, /reject duplicate ids, stale base hashes, invalid asset refs, and\s+disallowed paths/);
+  assert.match(doc, /does not claim runtime authority, product readiness, hardware GPU evidence/);
 });
 
 test('V2 proof index records backend Studio publish and aggregate evidence refs', async () => {
