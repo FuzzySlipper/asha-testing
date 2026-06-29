@@ -1,10 +1,10 @@
-# ASHA game workflow V1
+# ASHA game workflow V1/V2
 
-`asha-demo` is a boundary-proof reference consumer, not a product game. The V1
+`asha-demo` is a boundary-proof reference consumer, not a product game. The V1/V2
 workflow proves that a game-shaped workspace can be validated, inspected by Studio,
 debugged through typed devtools attach messages, resolved through dev/publish
-resource profiles, and published into deterministic runnable evidence without
-importing ASHA internals.
+resource profiles, run through a manifest-selected native backend, and published
+into deterministic runnable/staged evidence without importing ASHA internals.
 
 ## Workspace manifest
 
@@ -13,8 +13,8 @@ The entry point is `asha.game.toml`.
 - `[asha]` pins engine, contracts, runtime bridge, devtools, and publish artifact
   compatibility versions.
 - `[workspace]` declares scene, asset, replay, catalog, and policy roots.
-- `[runtime]` declares the local dev command, typed devtools endpoint, and reference
-  runtime entry.
+- `[runtime]` declares the local dev command, typed devtools endpoint, runtime
+  entry, selected backend mode/profile, and required backend proof refs.
 - `[studio]` declares whether Studio attach is allowed and which source roots are
   writable.
 - `[publish]` declares `npm run publish:artifact`, `harness/out`, and
@@ -65,15 +65,17 @@ texture.demo-checker
 
 ## Dev runtime and Studio attach
 
-Start the local reference runtime endpoint:
+Start the local selected-backend runtime endpoint:
 
 ```bash
 npm run dev
 ```
 
 The runtime exposes the typed `@asha/devtools` attach protocol at the endpoint
-declared in `asha.game.toml`. The runtime mode is `reference`; it is deliberately
-not native, WASM, GPU, or performance evidence.
+declared in `asha.game.toml`. In V2 the manifest-selected runtime mode is
+`native` with profile `native.napi.launcher.v1` and backend proof ref
+`proof:dev-authority-smoke`. It is still deliberately not WASM authority,
+hardware GPU evidence, or performance evidence.
 
 Headless verification:
 
@@ -81,6 +83,7 @@ Headless verification:
 npm run devtools:smoke
 npm run dev:smoke
 npm run dev:authority-smoke
+npm run backend:authority-smoke
 ```
 
 Important outputs:
@@ -89,6 +92,7 @@ Important outputs:
 harness/out/devtools/latest/index.json
 harness/out/dev-smoke/latest/index.json
 harness/out/dev-authority-smoke/latest/index.json
+harness/out/backend-authority-smoke/latest/index.json
 ```
 
 The dev smoke path performs typed attach/readout work through public protocol
@@ -103,10 +107,11 @@ command.propose
 evidence.export
 ```
 
-`dev:authority-smoke` proves the reference runtime command path more directly:
+`dev:authority-smoke` proves the selected runtime command path more directly:
 an accepted command changes the authority/projection hashes, a rejected command
-preserves them, and command evidence is checked by
-`scripts/check-dev-runtime-command-evidence.mjs`.
+preserves them, native proof refs are present, and command evidence is checked by
+`scripts/check-dev-runtime-command-evidence.mjs`. `backend:authority-smoke`
+adds normalized reference/native hash comparison and records `not_wasm_authority`.
 
 ## Studio cockpit
 
@@ -236,18 +241,25 @@ evidenceVersion: publish-evidence.v1
 It correlates:
 
 - publish artifact path, file hash, artifact id/hash, artifact version, compiled
-  asset count, publish asset count, runnable target, entrypoint hash, and resource
-  pack manifest hash;
+  asset count, publish asset count, V1 runnable target, V2 runtime-backed target,
+  entrypoint hash, and resource pack manifest hash;
 - publish smoke path/hash, checks, readback artifact hash, packed resources, and
   dependency guard result `no-studio-dev-only-fragments`;
 - publish run-smoke path/hash, runnable artifact metadata, `runtimeMode: "reference"`,
   projection world hash, accepted/rejected command proof, resolved resource count,
-  and checks;
+  and checks for the V1 static reference target;
+- publish backend run-smoke path/hash, staged native backend metadata,
+  `runtimeMode: "native"`, `backendProfile: "native.napi.launcher.v1"`, packed
+  resources, accepted/rejected command proof, dependency guard readback, and
+  explicit rejection of hidden reference-runtime fallback;
 - validations including `runtime_projection_readback_present`,
-  `packaged_command_proof_present`, and `studio_dev_only_dependency_guard_passed`;
-- non-claims including `not_native_runtime_authority`,
-  `not_hardware_gpu_evidence`, `not_performance_evidence`, and
-  `not_store_submission`.
+  `packaged_command_proof_present`, `backend_runtime_projection_readback_present`,
+  `backend_packaged_command_proof_present`, `backend_no_dev_server_smoke_passed`,
+  and `studio_dev_only_dependency_guard_passed`;
+- non-claims including `not_wasm_authority`, `not_hardware_gpu_evidence`,
+  `not_performance_evidence`, `not_store_submission`, `not_installer`, and
+  `not_package_signing`. The legacy V1 static-reference slice still records
+  `not_native_runtime` for that target only.
 
 ## Aggregate local checks
 
@@ -310,20 +322,22 @@ and the V1 aggregate compatibility artifact.
 
 ## Non-claims
 
-V1 evidence is intentionally narrow.
+Evidence is intentionally narrow and target-scoped.
 
-- `runtimeMode: "reference"` means deterministic reference runtime evidence only.
-- Native runtime evidence requires an explicit native proof reference and approved
-  public runtime-bridge path.
+- The V1 static reference publish target still reports `runtimeMode: "reference"`
+  and is not native/WASM authority.
+- The V2 selected backend reports `runtimeMode: "native"` only when a fresh public
+  backend proof ref is present and the command/evidence hashes are current.
 - WASM authority evidence requires an explicit WASM proof reference and approved
-  public path.
+  public path; V2 currently records `not_wasm_authority`.
 - Browser or Studio screenshots are not hardware GPU evidence or performance
   evidence.
 - Publish artifacts and publish evidence are not store submission, installer,
-  package signing, multiplayer, native services, or production product claims.
-- Studio panels are readout/control surfaces over public ASHA contracts. They are
-  not the runtime authority, publish builder, asset database of record, or private
-  mutation channel.
+  package signing, multiplayer, native services beyond the selected backend smoke,
+  or production product claims.
+- Studio panels are readout/control surfaces over public ASHA contracts and
+  runtime-bridge/devtools facades. They are not the runtime authority, publish
+  builder, asset database of record, or private mutation channel.
 
 ## Troubleshooting
 

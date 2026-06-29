@@ -29,7 +29,7 @@ are approved. Browser-only static reference publishing remains the V1 target in
 
 ## Staged Artifact Layout
 
-The V2 artifact should be written under the publish artifact directory:
+The V2 artifact is written under the publish artifact directory:
 
 ```text
 harness/out/publish/backend-native/latest/

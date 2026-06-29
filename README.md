@@ -12,7 +12,7 @@ It is **not**:
 
 ## Current dependency boundary
 
-V1 is TypeScript/runtime-bridge first. The machine-readable source of truth for the current allow/deny list is `boundary-policy.json`; prose in this README and `AGENTS.md` must agree with that file.
+V2 is selected-backend/runtime-bridge first. The machine-readable source of truth for the current allow/deny list is `boundary-policy.json`; prose in this README and `AGENTS.md` must agree with that file.
 
 The approved ASHA package roots for the game-workflow scaffold are:
 
@@ -48,10 +48,13 @@ Then run:
 ```bash
 npm test
 npm run conformance
+npm run backend:authority-smoke
 npm run camera:mover
 npm run dev:smoke
 npm run publish:evidence
+npm run proof:v2-index
 npm run check:boundary
+npm run verify:workflow:v2
 npm run ci
 ```
 
@@ -64,12 +67,15 @@ The current game-shaped workflow is documented in `docs/game-workflow.md`.
 Main commands:
 
 - `npm run check:manifest` validates `asha.game.toml`;
+- `npm run backend:authority-smoke` proves the manifest-selected native backend through the public runtime bridge, including accepted/rejected command hashes and normalized reference comparison;
 - `npm run dev:smoke` starts the typed devtools runtime and verifies Studio-equivalent attach/projection/telemetry/command flow;
 - `npm run publish:artifact` writes `harness/out/publish/latest/index.json`;
 - `npm run publish:check` recomputes publish hashes and rejects dev-only Studio/attach leakage;
 - `npm run publish:smoke` writes publish smoke evidence;
+- `npm run publish:backend-run-smoke` runs the staged native backend artifact without a dev server;
 - `npm run publish:evidence` writes the validated publish evidence manifest;
-- `npm run verify:workflow` writes the aggregate dev plus Studio attach plus publish verification artifact.
+- `npm run proof:v2-index` writes the V2 proof index consumed by closeout;
+- `npm run verify:workflow` writes the compatibility aggregate and `npm run verify:workflow:v2` writes the V2 native runtime/publish/Studio aggregate artifact.
 
 Backend mode opt-in lives in `asha.game.toml` under `[runtime]`. A reference-only
 consumer must declare `backend_mode = "reference"` and
@@ -83,23 +89,28 @@ such as `@asha/native-bridge`, `native-bridge.node`, WASM memory handles, ASHA
 
 ## Conformance harness
 
-`npm run conformance` runs the first public-boundary proof and writes `harness/out/conformance/latest/index.json`.
+`npm run conformance` runs the public-boundary proof and writes `harness/out/conformance/latest/index.json`.
 
 Current strongest available slice:
 
 1. load `harness/conformance/fixtures/minimal-world.json`;
-2. initialize `@asha/runtime-bridge` through the public mock facade;
+2. initialize `@asha/runtime-bridge` through the public facade and probe native availability through the approved facade path;
 3. load the abstract world fixture through `loadWorldBundle`;
 4. submit a generated contract-shaped command through `submitCommands`;
 5. step simulation and read public render-diff evidence;
 6. save current world summary;
-7. record deterministic artifact metadata including state hash, boundary-check result, and explicit gaps.
+7. record deterministic artifact metadata including state hash, boundary-check result, resolved evidence, and explicit non-claims/gaps.
 
-Explicit gaps in the artifact:
+The V2 workflow's stronger native proof lives in:
 
-- native Rust authority path is recorded as unavailable/unwired and linked to follow-up task #2559 when the native addon is absent or `submitCommands` is not wired;
-- screenshot/headless render evidence remains pending task #2509, so this harness records public render-diff evidence instead;
-- consumer compatibility metadata remains pending task #2536.
+```text
+harness/out/backend-authority-smoke/latest/index.json
+harness/out/v2-proof-index/latest/index.json
+harness/out/game-workflow-v2/latest/index.json
+```
+
+Remaining non-claims are explicit: the workflow is not hardware GPU evidence,
+performance evidence, store submission, installer, or package-signing proof.
 
 ## Camera mover prototype
 

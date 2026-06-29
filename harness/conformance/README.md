@@ -1,6 +1,8 @@
 # Conformance harness
 
-Task #2539 owns the first `asha-demo` public-boundary conformance harness.
+Task #2539 owns the first `asha-demo` public-boundary conformance harness; V2
+keeps it as the compatibility/public-surface proof beside the stronger selected
+backend artifacts.
 
 Command:
 
@@ -22,16 +24,23 @@ The harness intentionally uses only Tier 1 public packages:
 Current flow:
 
 1. read `harness/conformance/fixtures/minimal-world.json`;
-2. initialize a runtime through the public `@asha/runtime-bridge` mock facade;
+2. initialize a runtime through the public `@asha/runtime-bridge` facade and probe
+   native availability without importing raw transports;
 3. load an abstract world fixture through `loadWorldBundle`;
 4. submit a generated contract-shaped command through `submitCommands`;
 5. step simulation;
 6. read public render-diff evidence;
 7. save current world summary;
-8. write artifact metadata with deterministic state hash, boundary-check result, public imports, and explicit gaps.
+8. write artifact metadata with deterministic state hash, boundary-check result,
+   public imports, resolved evidence, and explicit gaps/non-claims.
 
-This is the strongest available proof without cheating through ASHA internals. The artifact records the remaining gaps instead of pretending the full future path exists:
+The stronger V2 native authority proof is intentionally separate:
 
-- native authority is unavailable or unwired when the native addon is absent or a native operation fail-closes; this is linked to follow-up task #2559;
-- screenshot/headless render evidence is pending task #2509;
-- consumer compatibility metadata is pending task #2536.
+```text
+harness/out/backend-authority-smoke/latest/index.json
+harness/out/v2-proof-index/latest/index.json
+harness/out/game-workflow-v2/latest/index.json
+```
+
+Do not infer hardware GPU, performance, installer, signing, store submission, or
+WASM authority from the conformance harness.
