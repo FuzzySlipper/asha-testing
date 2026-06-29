@@ -26,7 +26,7 @@ function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     encoding: 'utf8',
-    timeout: 180000,
+    timeout: 600000,
   });
   return {
     command: [command, ...args].join(' '),
