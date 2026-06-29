@@ -13,6 +13,7 @@ import {
   validateAshaGameAssetCatalog,
 } from '@asha/game-workspace';
 import {
+  createNativeGameRuntimeLauncher,
   createReferenceGameRuntimeLauncher,
   frameCursor,
 } from '@asha/runtime-bridge';
@@ -45,6 +46,7 @@ const manifestText = readFileSync(join(repoRoot, 'asha.game.toml'), 'utf8');
 const manifestHash = sha256(manifestText);
 const manifest = parseAshaGameManifestToml(manifestText);
 assert.equal(manifest.ok, true, manifest.ok ? '' : JSON.stringify(manifest.diagnostics));
+const runtimeManifest = manifest.manifest.runtime;
 const fixture = JSON.parse(readFileSync(join(repoRoot, manifest.manifest.runtime.wasmOrNativeEntry), 'utf8'));
 const scene = JSON.parse(readFileSync(join(repoRoot, 'scenes/minimal.scene.json'), 'utf8'));
 const proofScenes = manifest.manifest.workspace.sceneRoots.flatMap((root) =>
@@ -74,7 +76,10 @@ assert.equal(assetResolutions.every((resolution) => resolution !== null), true);
 const catalogIds = new Set(catalogValidation.catalog.entries.map((entry) => entry.id));
 assert.equal(proofScenes.every((proofScene) => proofScene.catalogAssetIds.every((assetId) => catalogIds.has(assetId))), true);
 
-const launcher = createReferenceGameRuntimeLauncher();
+const launcher =
+  manifest.manifest.runtime.backendMode === 'native'
+    ? createNativeGameRuntimeLauncher()
+    : createReferenceGameRuntimeLauncher();
 const runtimeSession = await launcher.launch({
   gameId: 'asha-demo',
   workspaceId: 'workspace.local',
@@ -145,9 +150,14 @@ async function handleMessage(message) {
           gameId: runtimeSession.identity.gameId,
           workspaceId: message.requestedWorkspaceId,
           runtimeMode: runtimeSession.identity.runtimeMode,
+          runtimeEntry: runtimeSession.identity.runtimeEntry,
           startedAtIso: runtimeSession.identity.startedAtIso,
           launcherName: runtimeSession.launch.runtimeProfile.launcherName,
           runtimeProfileId: runtimeSession.launch.runtimeProfile.profileId,
+          backendMode: runtimeManifest.backendMode,
+          backendProfile: runtimeManifest.backendProfile,
+          backendProofRefs: runtimeManifest.backendProofRefs,
+          nativeProofRef: runtimeManifest.backendMode === 'native' ? runtimeManifest.backendProofRefs[0] : undefined,
           nonClaims: runtimeSession.identity.nonClaims,
         },
       };
@@ -202,6 +212,10 @@ async function handleMessage(message) {
           replayId: replay.replayId,
           runtimeMode: runtimeSession.identity.runtimeMode,
           launcherName: runtimeSession.launch.runtimeProfile.launcherName,
+          backendMode: runtimeManifest.backendMode,
+          backendProfile: runtimeManifest.backendProfile,
+          backendProofRefs: runtimeManifest.backendProofRefs,
+          nativeProofRef: runtimeManifest.backendMode === 'native' ? runtimeManifest.backendProofRefs[0] : null,
           manifestHash,
           scene: { sceneId: scene.sceneId, name: scene.name, catalogAssetIds: scene.catalogAssetIds },
           commandReceipts,
@@ -232,6 +246,10 @@ async function handleMessage(message) {
             ...runtimeSession.identity,
             launcherName: runtimeSession.launch.runtimeProfile.launcherName,
             runtimeProfileId: runtimeSession.launch.runtimeProfile.profileId,
+            backendMode: runtimeManifest.backendMode,
+            backendProfile: runtimeManifest.backendProfile,
+            backendProofRefs: runtimeManifest.backendProofRefs,
+            nativeProofRef: runtimeManifest.backendMode === 'native' ? runtimeManifest.backendProofRefs[0] : undefined,
           },
           manifestHash,
           scene: { sceneId: scene.sceneId, name: scene.name, catalogAssetIds: scene.catalogAssetIds },

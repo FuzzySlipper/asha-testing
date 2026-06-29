@@ -21,6 +21,10 @@ if (evidence.runtime.runtimeMode === 'reference') {
 }
 if (evidence.runtime.runtimeMode === 'native') {
   assert.equal(typeof evidence.runtime.nativeProofRef, 'string', 'nativeProofRef required for native runtimeMode');
+  assert.ok(Array.isArray(evidence.runtime.backendProofRefs), 'backendProofRefs required for native runtimeMode');
+  assert.ok(evidence.runtime.backendProofRefs.includes(evidence.runtime.nativeProofRef), 'nativeProofRef must be one of backendProofRefs');
+  assert.equal(evidence.projection.authorityHash.startsWith('reference-authority:'), false, 'native runtimeMode must not export reference authority hashes');
+  assert.equal(evidence.projection.worldHash.startsWith('reference-world:'), false, 'native runtimeMode must not export reference world hashes');
 }
 if (evidence.runtime.runtimeMode === 'wasm') {
   assert.equal(typeof evidence.runtime.wasmProofRef, 'string', 'wasmProofRef required for wasm runtimeMode');

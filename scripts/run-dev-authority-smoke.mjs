@@ -35,7 +35,9 @@ const devSmoke = JSON.parse(devSmokeText);
 const evidenceText = await readFile(join(repoRoot, devSmoke.client.evidence.path), 'utf8');
 const evidence = JSON.parse(evidenceText);
 
-assert.equal(devSmoke.client.runtime.runtimeMode, 'reference');
+assert.equal(devSmoke.client.runtime.runtimeMode, 'native');
+assert.equal(devSmoke.client.runtime.backendProfile, 'native.napi.launcher.v1');
+assert.deepEqual(devSmoke.client.runtime.backendProofRefs, ['proof:dev-authority-smoke']);
 assert.equal(devSmoke.client.command.status, 'accepted');
 assert.equal(devSmoke.client.rejectedCommand.status, 'rejected');
 assert.notEqual(devSmoke.client.command.authorityHashBefore, devSmoke.client.command.authorityHashAfter);
@@ -50,6 +52,13 @@ const artifact = {
     evidenceCheck: evidenceCheckRun,
   },
   runtime: devSmoke.client.runtime,
+  backend: {
+    mode: devSmoke.client.runtime.backendMode,
+    profile: devSmoke.client.runtime.backendProfile,
+    proofRefs: devSmoke.client.runtime.backendProofRefs,
+    nativeProofRef: devSmoke.client.runtime.nativeProofRef,
+    moduleRef: devSmoke.client.runtime.runtimeEntry ?? null,
+  },
   acceptedCommand: devSmoke.client.command,
   rejectedCommand: devSmoke.client.rejectedCommand,
   projection: {
@@ -69,7 +78,8 @@ const artifact = {
     },
   },
   validations: [
-    'runtime_mode_reference',
+    'runtime_mode_native',
+    'backend_proof_refs_present',
     'accepted_command_mutated_authority',
     'rejected_command_preserved_authority',
     'command_evidence_readback_passed',

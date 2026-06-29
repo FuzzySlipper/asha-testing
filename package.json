@@ -8,6 +8,7 @@
     "camera:mover": "node scripts/run-camera-mover.mjs",
     "camera:agora-control": "node scripts/run-camera-agora-control.mjs",
     "asset:inventory": "node scripts/build-asset-inventory.mjs",
+    "backend:authority-smoke": "node scripts/run-backend-authority-smoke.mjs",
     "voxel:interaction": "node scripts/run-voxel-interaction.mjs",
     "check:boundary": "node scripts/check-boundary.mjs",
     "check:assets": "node scripts/check-assets.mjs",

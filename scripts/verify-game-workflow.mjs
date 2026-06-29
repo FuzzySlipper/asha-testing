@@ -124,7 +124,7 @@ const body = {
     'studio_boundaries_passed',
   ],
   nonClaims: [
-    'not_native_runtime_authority',
+    'not_wasm_authority',
     'not_hardware_gpu_evidence',
     'not_performance_evidence',
     'not_store_submission',

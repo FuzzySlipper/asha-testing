@@ -17,6 +17,9 @@ policy_packages = ["packages/game-policy"]
 dev_command = "npm run dev"
 devtools_endpoint = "ws://127.0.0.1:7391"
 wasm_or_native_entry = "harness/conformance/fixtures/minimal-world.json"
+backend_mode = "native"
+backend_profile = "native.napi.launcher.v1"
+backend_proof_refs = ["proof:dev-authority-smoke"]
 
 [studio]
 workspace_mode = true

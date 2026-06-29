@@ -91,14 +91,16 @@ assert.deepEqual(
   artifact.proofScenes.find((scene) => scene.name === 'ASHA Demo Material Proof')?.catalogAssetIds,
   ['mesh.demo-cube', 'material.demo-copper', 'texture.demo-checker'],
 );
-assert.equal(artifact.client.runtime.runtimeMode, 'reference');
-assert.equal(artifact.client.runtime.launcherName, 'reference-game-runtime-launcher');
-assert.equal(artifact.client.projection.worldHash, 'reference-world:asha-demo:1001:accepted:0');
+assert.equal(artifact.client.runtime.runtimeMode, 'native');
+assert.equal(artifact.client.runtime.launcherName, 'native-game-runtime-launcher');
+assert.equal(artifact.client.runtime.backendProfile, 'native.napi.launcher.v1');
+assert.deepEqual(artifact.client.runtime.backendProofRefs, ['proof:dev-authority-smoke']);
+assert.equal(artifact.client.projection.worldHash, 'native-world:asha-demo:1001:accepted:0');
 assert.equal(artifact.client.command.status, 'accepted');
-assert.equal(artifact.client.command.authorityHashAfter, 'reference-authority:workspace.local:1001:accepted:1');
+assert.equal(artifact.client.command.authorityHashAfter, 'native-authority:workspace.local:1001:accepted:1');
 assert.equal(artifact.client.rejectedCommand.status, 'rejected');
 assert.equal(artifact.client.rejectedCommand.authorityHashAfter, artifact.client.command.authorityHashAfter);
-assert.equal(artifact.client.afterProjection.worldHash, 'reference-world:asha-demo:1001:accepted:1');
+assert.equal(artifact.client.afterProjection.worldHash, 'native-world:asha-demo:1001:accepted:1');
 assert.equal(artifact.client.replay.path, 'harness/out/replay/dev-smoke-command-path.json');
 assert.equal(artifact.client.evidence.path, 'harness/out/devtools/latest/index.json');
 assert.equal(artifact.shutdown.exitCode, 0);
@@ -106,7 +108,8 @@ assert.equal(artifact.shutdown.signal, null);
 
 const evidence = JSON.parse(await readFile(join(repoRoot, artifact.client.evidence.path), 'utf8'));
 assert.equal(evidence.artifactKind, 'asha_demo_dev_runtime_command_evidence');
-assert.equal(evidence.runtime.runtimeMode, 'reference');
+assert.equal(evidence.runtime.runtimeMode, 'native');
+assert.equal(evidence.runtime.nativeProofRef, 'proof:dev-authority-smoke');
 assert.equal(evidence.commandReceipts.length, 2);
 assert.equal(evidence.commandReceipts[0].status, 'accepted');
 assert.equal(evidence.commandReceipts[1].status, 'rejected');

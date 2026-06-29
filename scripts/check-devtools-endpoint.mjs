@@ -15,27 +15,31 @@ assert.equal(handshake.type, 'handshake.response');
 assert.equal(handshake.accepted, true);
 assert.equal(handshake.protocolVersion, ASHA_DEVTOOLS_PROTOCOL_VERSION);
 assert.equal(handshake.runtime.gameId, 'asha-demo');
-assert.equal(handshake.runtime.runtimeMode, 'reference');
-assert.equal(handshake.runtime.launcherName, 'reference-game-runtime-launcher');
-assert.equal(handshake.runtime.nonClaims.includes('not_native_runtime'), true);
+assert.equal(handshake.runtime.runtimeMode, 'native');
+assert.equal(handshake.runtime.launcherName, 'native-game-runtime-launcher');
+assert.equal(handshake.runtime.backendMode, 'native');
+assert.equal(handshake.runtime.backendProfile, 'native.napi.launcher.v1');
+assert.deepEqual(handshake.runtime.backendProofRefs, ['proof:dev-authority-smoke']);
+assert.equal(handshake.runtime.nativeProofRef, 'proof:dev-authority-smoke');
+assert.equal(handshake.runtime.nonClaims.includes('not_native_runtime'), false);
 
 const projection = await exchangeJsonWebSocket(endpoint, fixtures.projectionPull);
 assert.equal(projection.type, 'projection.snapshot');
-assert.equal(projection.summary.worldHash, 'reference-world:asha-demo:1001:accepted:0');
+assert.equal(projection.summary.worldHash, 'native-world:asha-demo:1001:accepted:0');
 assert.equal(projection.diagnostics.includes('scene:ASHA Demo Minimal Cube'), true);
 assert.equal(projection.diagnostics.includes('asset:mesh.demo-cube'), true);
-assert.equal(projection.diagnostics.includes('runtime:reference'), true);
+assert.equal(projection.diagnostics.includes('runtime:native'), true);
 
 const command = await exchangeJsonWebSocket(endpoint, fixtures.commandProposal);
 assert.equal(command.type, 'command.result');
 assert.equal(command.proposal.status, 'accepted');
 assert.equal(command.proposal.result.accepted, 1);
-assert.equal(command.proposal.authorityHashAfter, 'reference-authority:workspace.local:1001:accepted:1');
+assert.equal(command.proposal.authorityHashAfter, 'native-authority:workspace.local:1001:accepted:1');
 
 const afterProjection = await exchangeJsonWebSocket(endpoint, fixtures.projectionPull);
 assert.equal(afterProjection.type, 'projection.snapshot');
 assert.notEqual(afterProjection.summary.worldHash, projection.summary.worldHash);
-assert.equal(afterProjection.summary.worldHash, 'reference-world:asha-demo:1001:accepted:1');
+assert.equal(afterProjection.summary.worldHash, 'native-world:asha-demo:1001:accepted:1');
 
 const rejectedCommand = await exchangeJsonWebSocket(endpoint, {
   type: 'command.propose',

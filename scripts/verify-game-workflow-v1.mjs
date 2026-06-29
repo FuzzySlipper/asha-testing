@@ -104,7 +104,8 @@ const studioTests = await readStudioSource('test/substrate-scaffold.test.ts');
 
 assert.equal(runtimeAuthority.json.artifactKind, 'asha_demo_dev_authority_smoke');
 assert.equal(runtimeAuthority.json.artifactVersion, 'dev-authority-smoke.v1');
-assert.equal(runtimeAuthority.json.runtime.runtimeMode, 'reference');
+assert.equal(runtimeAuthority.json.runtime.runtimeMode, 'native');
+assert.equal(runtimeAuthority.json.backend.profile, 'native.napi.launcher.v1');
 assert.equal(runtimeAuthority.json.acceptedCommand.status, 'accepted');
 assert.equal(runtimeAuthority.json.rejectedCommand.status, 'rejected');
 assert.notEqual(
@@ -161,6 +162,8 @@ const body = {
       path: runtimeAuthority.path,
       fileHash: runtimeAuthority.fileHash,
       runtimeMode: runtimeAuthority.json.runtime.runtimeMode,
+      backendProfile: runtimeAuthority.json.backend.profile,
+      backendProofRefs: runtimeAuthority.json.backend.proofRefs,
       acceptedAuthorityHashBefore: runtimeAuthority.json.acceptedCommand.authorityHashBefore,
       acceptedAuthorityHashAfter: runtimeAuthority.json.acceptedCommand.authorityHashAfter,
       rejectedAuthorityHashBefore: runtimeAuthority.json.rejectedCommand.authorityHashBefore,
@@ -221,7 +224,7 @@ const body = {
     'studio_cockpit_markers_present',
   ],
   nonClaims: [
-    'not_native_runtime_authority',
+    'not_wasm_authority',
     'not_hardware_gpu_evidence',
     'not_performance_evidence',
     'not_store_submission',

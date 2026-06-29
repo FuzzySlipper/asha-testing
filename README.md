@@ -71,6 +71,16 @@ Main commands:
 - `npm run publish:evidence` writes the validated publish evidence manifest;
 - `npm run verify:workflow` writes the aggregate dev plus Studio attach plus publish verification artifact.
 
+Backend mode opt-in lives in `asha.game.toml` under `[runtime]`. A reference-only
+consumer must declare `backend_mode = "reference"` and
+`backend_profile = "reference"`. A selected runtime-backed consumer declares a
+public profile such as `backend_mode = "native"`,
+`backend_profile = "native.napi.launcher.v1"`, and at least one
+`backend_proof_refs` entry. The manifest validator rejects raw transport hints
+such as `@asha/native-bridge`, `native-bridge.node`, WASM memory handles, ASHA
+`src/` paths, or `engine-rs/` paths; downstream repos must go through the
+`@asha/runtime-bridge` public launcher/facade.
+
 ## Conformance harness
 
 `npm run conformance` runs the first public-boundary proof and writes `harness/out/conformance/latest/index.json`.
