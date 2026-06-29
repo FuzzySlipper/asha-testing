@@ -144,6 +144,15 @@ and non-claims.
 V1 runnable target decision:
 [`docs/runnable-publish-target.md`](./runnable-publish-target.md).
 
+V2 runtime-backed target decision:
+[`docs/runtime-backed-publish-target-v2.md`](./runtime-backed-publish-target-v2.md).
+
+The V2 target is `asha-demo-staged-backend-native.v2`: a staged selected-backend
+native artifact with packed resources, public backend metadata, runtime evidence
+refs, and a no-dev-server smoke. It is distinct from the V1 browser/static
+reference runnable and from store packaging, signing, installers, and production
+bundle claims.
+
 Build the publish artifact:
 
 ```bash
@@ -181,6 +190,7 @@ Publish smoke:
 ```bash
 npm run publish:smoke
 npm run publish:run-smoke
+npm run publish:backend-run-smoke
 ```
 
 Outputs:
@@ -188,6 +198,7 @@ Outputs:
 ```text
 harness/out/publish-smoke/latest/index.json
 harness/out/publish-run-smoke/latest/index.json
+harness/out/publish-backend-run-smoke/latest/index.json
 ```
 
 `publish:smoke` validates build/readback correlation, packed resource profile
@@ -195,6 +206,10 @@ output, and dependency guard status. `publish:run-smoke` launches the static
 reference runnable without a dev server and verifies reference runtime metadata,
 resource resolution, projection readback, accepted-command mutation, rejected-command
 preservation, and the absence of a required devtools endpoint.
+`publish:backend-run-smoke` launches the V2 staged native backend artifact without
+a dev server and verifies backend runtime/module metadata, packed resources,
+projection readback, accepted/rejected command behavior, and rejection of hidden
+reference-runtime fallback.
 
 ## Publish evidence manifest
 
@@ -244,6 +259,7 @@ npm run dev:smoke
 npm run publish:evidence
 npm run verify:workflow
 npm run verify:workflow:v1
+npm run verify:workflow:v2
 ```
 
 `npm test` runs the Node test suite plus the demo boundary check. It covers
@@ -260,6 +276,12 @@ harness/out/game-workflow/latest/index.json
 
 ```text
 harness/out/game-workflow-v1/latest/index.json
+```
+
+`npm run verify:workflow:v2` writes the V2 runtime-backed aggregate:
+
+```text
+harness/out/game-workflow-v2/latest/index.json
 ```
 
 The V1 aggregate gate runs:
@@ -281,6 +303,10 @@ The V1 aggregate artifact records runtime authority evidence, child artifact ref
 and hashes, assets V1/resource pack refs, publish target/run-smoke refs, Studio
 cockpit source markers, validation names, and workflow non-claims. It fails closed
 if child artifact hashes are stale or required Studio cockpit markers are missing.
+
+The V2 aggregate consumes the stable V2 proof index, selected backend authority
+smoke, replay/hash refs, Studio live backend evidence, publish backend evidence,
+and the V1 aggregate compatibility artifact.
 
 ## Non-claims
 

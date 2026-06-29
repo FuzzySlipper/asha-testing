@@ -12,6 +12,7 @@ const evidencePath = path.join(outDir, 'index.json');
 const publishArtifactPath = path.join(repoRoot, 'harness/out/publish/latest/index.json');
 const publishSmokePath = path.join(repoRoot, 'harness/out/publish-smoke/latest/index.json');
 const publishRunSmokePath = path.join(repoRoot, 'harness/out/publish-run-smoke/latest/index.json');
+const publishBackendRunSmokePath = path.join(repoRoot, 'harness/out/publish-backend-run-smoke/latest/index.json');
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
@@ -61,16 +62,19 @@ async function readJsonWithHash(filePath) {
 
 const build = run('npm', ['run', 'publish:artifact']);
 requirePassed(build);
-const readback = run(process.execPath, ['scripts/check-publish-artifact.mjs']);
-const readbackSummary = parseJsonStdout(readback);
 const smokeRun = run(process.execPath, ['scripts/run-publish-smoke.mjs']);
 requirePassed(smokeRun);
+const readback = run(process.execPath, ['scripts/check-publish-artifact.mjs']);
+const readbackSummary = parseJsonStdout(readback);
 const runSmoke = run('npm', ['run', 'publish:run-smoke']);
 requirePassed(runSmoke);
+const backendRunSmoke = run('npm', ['run', 'publish:backend-run-smoke']);
+requirePassed(backendRunSmoke);
 
 const publishArtifact = await readJsonWithHash(publishArtifactPath);
 const publishSmoke = await readJsonWithHash(publishSmokePath);
 const publishRunSmoke = await readJsonWithHash(publishRunSmokePath);
+const publishBackendRunSmoke = await readJsonWithHash(publishBackendRunSmokePath);
 
 assert.equal(publishArtifact.json.artifactHash, readbackSummary.artifactHash);
 assert.equal(publishSmoke.json.readback.artifactHash, readbackSummary.artifactHash);
@@ -80,6 +84,10 @@ assert.equal(publishRunSmoke.json.artifactKind, 'asha_demo_publish_run_smoke');
 assert.equal(publishRunSmoke.json.runtime.runtimeMode, 'reference');
 assert.equal(publishRunSmoke.json.commandProof.acceptedCommand.status, 'accepted');
 assert.equal(publishRunSmoke.json.commandProof.rejectedCommand.status, 'rejected');
+assert.equal(publishBackendRunSmoke.json.artifactKind, 'asha_demo_publish_backend_run_smoke');
+assert.equal(publishBackendRunSmoke.json.runtime.runtimeMode, 'native');
+assert.equal(publishBackendRunSmoke.json.commandProof.acceptedCommand.status, 'accepted');
+assert.equal(publishBackendRunSmoke.json.commandProof.rejectedCommand.status, 'rejected');
 
 const evidenceBody = {
   evidenceKind: 'asha_demo_publish_evidence_manifest',
@@ -98,6 +106,10 @@ const evidenceBody = {
     runnableEntrypointHash: publishArtifact.json.runnableArtifact.entrypointHash,
     resourcePackManifestPath: publishArtifact.json.resourcePack.manifestPath,
     resourcePackManifestHash: publishArtifact.json.resourcePack.manifestHash,
+    runtimeBackedTarget: publishArtifact.json.runtimeBackedArtifact.target,
+    runtimeBackedBackendMode: publishArtifact.json.runtimeBackedArtifact.backendMode,
+    runtimeBackedBackendProfile: publishArtifact.json.runtimeBackedArtifact.backendProfile,
+    runtimeBackedBackendProofRefs: publishArtifact.json.runtimeBackedArtifact.backendProofRefs,
   },
   publishSmoke: {
     path: publishSmoke.path,
@@ -115,11 +127,23 @@ const evidenceBody = {
     resolvedResourceCount: publishRunSmoke.json.resolvedResources.length,
     checks: publishRunSmoke.json.checks,
   },
+  publishBackendRunSmoke: {
+    path: publishBackendRunSmoke.path,
+    fileHash: publishBackendRunSmoke.hash,
+    runtimeBackedArtifact: publishBackendRunSmoke.json.runtimeBackedArtifact,
+    runtime: publishBackendRunSmoke.json.runtime,
+    projection: publishBackendRunSmoke.json.projection,
+    commandProof: publishBackendRunSmoke.json.commandProof,
+    resolvedResourceCount: publishBackendRunSmoke.json.resolvedResources.length,
+    checks: publishBackendRunSmoke.json.checks,
+    noDevServerRequired: publishBackendRunSmoke.json.noDevServerRequired,
+  },
   commands: {
     build,
     readback,
     smoke: smokeRun,
     runSmoke,
+    backendRunSmoke,
   },
   validations: [
     'publish_artifact_hash_matches_readback',
@@ -129,14 +153,20 @@ const evidenceBody = {
     'packed_resource_manifest_hash_recorded',
     'runtime_projection_readback_present',
     'packaged_command_proof_present',
+    'backend_runtime_projection_readback_present',
+    'backend_packaged_command_proof_present',
+    'backend_no_dev_server_smoke_passed',
     'compiled_asset_count_matches_readback',
     'studio_dev_only_dependency_guard_passed',
   ],
   nonClaims: [
     'not_native_runtime_authority',
+    'not_wasm_authority',
     'not_hardware_gpu_evidence',
     'not_performance_evidence',
     'not_store_submission',
+    'not_installer',
+    'not_package_signing',
   ],
 };
 

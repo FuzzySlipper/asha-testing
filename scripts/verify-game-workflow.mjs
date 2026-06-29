@@ -83,6 +83,7 @@ assert.equal(devSmoke.json.client.command.status, 'accepted');
 assert.equal(devSmoke.json.client.rejectedCommand.status, 'rejected');
 assert.equal(assetsV1.json.artifactKind, 'asha_demo_assets_v1_verification');
 assert.equal(publishEvidence.json.publishSmoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
+assert.equal(publishEvidence.json.publishBackendRunSmoke.runtime.runtimeMode, 'native');
 
 const body = {
   artifactKind: 'asha_demo_game_workflow_verification',
@@ -110,6 +111,8 @@ const body = {
       evidenceId: publishEvidence.json.evidenceId,
       evidenceHash: publishEvidence.json.evidenceHash,
       publishArtifactHash: publishEvidence.json.publishArtifact.artifactHash,
+      backendRunSmokeRuntimeMode: publishEvidence.json.publishBackendRunSmoke.runtime.runtimeMode,
+      backendRunSmokePath: publishEvidence.json.publishBackendRunSmoke.path,
     },
   },
   validations: [

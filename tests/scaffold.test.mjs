@@ -1,11 +1,48 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
 
 const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const repoRoot = new URL('..', import.meta.url);
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value) {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
+
+function rehashPublishArtifact(artifact) {
+  const { artifactHash, artifactId, ...body } = artifact;
+  void artifactHash;
+  void artifactId;
+  const nextHash = sha256(stableJson(body));
+  return {
+    ...artifact,
+    artifactId: `asha-demo-publish:${nextHash}`,
+    artifactHash: nextHash,
+  };
+}
+
+function rehashV2ProofIndex(index) {
+  const { indexHash, indexId, ...body } = index;
+  void indexHash;
+  void indexId;
+  const nextHash = sha256(stableJson(body));
+  return {
+    ...index,
+    indexId: `asha-demo-v2-proof-index:${nextHash}`,
+    indexHash: nextHash,
+  };
+}
 
 test('scaffold depends only on Tier 1 ASHA public TypeScript surfaces', () => {
   assert.deepEqual(packageJson.dependencies, {
@@ -624,6 +661,28 @@ test('publish artifact build writes compiled scene catalog and asset payloads', 
   assert.equal(artifact.runnableArtifact.runtimeMetadataPath, 'harness/out/publish/runnable/latest/runtime/reference-runtime.json');
   assert.equal(artifact.runnableArtifact.resourceManifestPath, 'harness/out/publish/runnable/latest/resources/manifest.json');
   assert.equal(artifact.runnableArtifact.resourceEntryCount, 3);
+  assert.equal(artifact.runtimeBackedArtifact.target, 'asha-demo-staged-backend-native.v2');
+  assert.equal(artifact.runtimeBackedArtifact.directory, 'harness/out/publish/backend-native/latest');
+  assert.equal(artifact.runtimeBackedArtifact.backendMode, 'native');
+  assert.equal(artifact.runtimeBackedArtifact.backendProfile, 'native.napi.launcher.v1');
+  assert.deepEqual(artifact.runtimeBackedArtifact.backendProofRefs, ['proof:dev-authority-smoke']);
+  assert.equal(artifact.runtimeBackedArtifact.resourceEntryCount, 3);
+  assert.equal(artifact.runtimeBackedArtifact.readbackPath, 'harness/out/publish/backend-native/latest/readback/index.json');
+  assert.deepEqual(artifact.runtimeBackedArtifact.evidenceRefs.map((entry) => entry.kind), [
+    'backend-authority-smoke',
+    'dev-runtime-command-evidence',
+    'publish-artifact',
+    'publish-smoke',
+    'dependency-guard',
+  ]);
+  const backendReadback = JSON.parse(await readFile(
+    new URL('../harness/out/publish/backend-native/latest/readback/index.json', import.meta.url),
+    'utf8',
+  ));
+  assert.equal(backendReadback.target, 'asha-demo-staged-backend-native.v2');
+  assert.equal(backendReadback.backend.backendMode, 'native');
+  assert.deepEqual(backendReadback.backend.backendProofRefs, ['proof:dev-authority-smoke']);
+  assert.ok(backendReadback.nonClaims.includes('not_private_runtime_transport'));
   assert.deepEqual(artifact.nonClaims, [
     'not_native_runtime_authority',
     'not_hardware_gpu_evidence',
@@ -650,6 +709,8 @@ test('publish artifact smoke verifies hashes payloads and writes readback eviden
   assert.equal(smoke.readback.packedResources.at(0)?.assetId, 'mesh.demo-cube');
   assert.match(smoke.readback.packedResources.at(0)?.packedHash, /^sha256:/);
   assert.ok(smoke.readback.dependencyGuard.inspectedRunnableFiles.includes('harness/out/publish/runnable/latest/index.html'));
+  assert.ok(smoke.readback.dependencyGuard.inspectedBackendFiles.includes('harness/out/publish/backend-native/latest/runtime/runtime-metadata.json'));
+  assert.ok(smoke.readback.dependencyGuard.forbiddenBackendFragments.includes('@asha/native-bridge'));
   assert.equal(smoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
   assert.ok(smoke.checks.includes('artifact_hash_recomputed'));
   assert.ok(smoke.checks.includes('compiled_assets_match_sources'));
@@ -741,6 +802,164 @@ test('publish artifact checker rejects forbidden markers inside runnable files',
   }
 });
 
+test('publish artifact checker rejects stale runtime-backed evidence refs', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const readbackUrl = new URL('../harness/out/publish/backend-native/latest/readback/index.json', import.meta.url);
+  const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
+  const original = await readFile(readbackUrl, 'utf8');
+  const originalArtifact = await readFile(artifactUrl, 'utf8');
+  try {
+    const readback = JSON.parse(original);
+    readback.evidenceRefs[0].sha256 = 'sha256:stale';
+    const nextReadback = `${JSON.stringify(readback, null, 2)}\n`;
+    await writeFile(readbackUrl, nextReadback);
+    const artifact = JSON.parse(originalArtifact);
+    artifact.runtimeBackedArtifact.readbackHash = sha256(nextReadback);
+    await writeFile(artifactUrl, `${JSON.stringify(rehashPublishArtifact(artifact), null, 2)}\n`);
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /evidence ref is stale/);
+  } finally {
+    await writeFile(readbackUrl, original);
+    await writeFile(artifactUrl, originalArtifact);
+  }
+});
+
+test('publish artifact checker rejects missing runtime-backed backend proof refs', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
+  const original = await readFile(artifactUrl, 'utf8');
+  try {
+    const artifact = JSON.parse(original);
+    artifact.runtimeBackedArtifact.backendProofRefs = [];
+    await writeFile(artifactUrl, `${JSON.stringify(rehashPublishArtifact(artifact), null, 2)}\n`);
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /backend proof refs/);
+  } finally {
+    await writeFile(artifactUrl, original);
+  }
+});
+
+test('publish artifact checker rejects forbidden markers inside runtime-backed files', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
+  const runtimeMetadataUrl = new URL('../harness/out/publish/backend-native/latest/runtime/runtime-metadata.json', import.meta.url);
+  const readbackUrl = new URL('../harness/out/publish/backend-native/latest/readback/index.json', import.meta.url);
+  const originalArtifact = await readFile(artifactUrl, 'utf8');
+  const originalRuntimeMetadata = await readFile(runtimeMetadataUrl, 'utf8');
+  const originalReadback = await readFile(readbackUrl, 'utf8');
+  try {
+    const runtimeMetadata = JSON.parse(originalRuntimeMetadata);
+    runtimeMetadata.forbiddenProbe = '@asha/native-bridge';
+    const nextRuntimeMetadata = `${JSON.stringify(runtimeMetadata, null, 2)}\n`;
+    await writeFile(runtimeMetadataUrl, nextRuntimeMetadata);
+
+    const readback = JSON.parse(originalReadback);
+    readback.runtimeMetadataHash = sha256(nextRuntimeMetadata);
+    const nextReadback = `${JSON.stringify(readback, null, 2)}\n`;
+    await writeFile(readbackUrl, nextReadback);
+
+    const artifact = JSON.parse(originalArtifact);
+    artifact.runtimeBackedArtifact.runtimeMetadataHash = sha256(nextRuntimeMetadata);
+    artifact.runtimeBackedArtifact.readbackHash = sha256(nextReadback);
+    await writeFile(artifactUrl, `${JSON.stringify(rehashPublishArtifact(artifact), null, 2)}\n`);
+
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /runtime-backed artifact file .*forbidden fragment/);
+  } finally {
+    await writeFile(runtimeMetadataUrl, originalRuntimeMetadata);
+    await writeFile(readbackUrl, originalReadback);
+    await writeFile(artifactUrl, originalArtifact);
+  }
+});
+
+test('publish artifact checker rejects runtime-backed resources that read dev-local source roots', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
+  const manifestUrl = new URL('../harness/out/publish/backend-native/latest/resources/manifest.json', import.meta.url);
+  const readbackUrl = new URL('../harness/out/publish/backend-native/latest/readback/index.json', import.meta.url);
+  const originalArtifact = await readFile(artifactUrl, 'utf8');
+  const originalManifest = await readFile(manifestUrl, 'utf8');
+  const originalReadback = await readFile(readbackUrl, 'utf8');
+  try {
+    const manifest = JSON.parse(originalManifest);
+    manifest.entries[0].path = 'assets/meshes/demo-cube.mesh.json';
+    const nextManifest = `${JSON.stringify(manifest, null, 2)}\n`;
+    await writeFile(manifestUrl, nextManifest);
+
+    const readback = JSON.parse(originalReadback);
+    readback.resourceManifestHash = sha256(nextManifest);
+    const nextReadback = `${JSON.stringify(readback, null, 2)}\n`;
+    await writeFile(readbackUrl, nextReadback);
+
+    const artifact = JSON.parse(originalArtifact);
+    artifact.runtimeBackedArtifact.resourceManifestHash = sha256(nextManifest);
+    artifact.runtimeBackedArtifact.readbackHash = sha256(nextReadback);
+    await writeFile(artifactUrl, `${JSON.stringify(rehashPublishArtifact(artifact), null, 2)}\n`);
+
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /resources\/|dev-local source root/);
+  } finally {
+    await writeFile(manifestUrl, originalManifest);
+    await writeFile(readbackUrl, originalReadback);
+    await writeFile(artifactUrl, originalArtifact);
+  }
+});
+
+test('publish artifact checker rejects stale runtime-backed module hashes', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const moduleRefUrl = new URL('../harness/out/publish/backend-native/latest/runtime/module-ref.json', import.meta.url);
+  const original = await readFile(moduleRefUrl, 'utf8');
+  try {
+    const moduleRef = JSON.parse(original);
+    moduleRef.moduleRefHash = 'sha256:stale';
+    await writeFile(moduleRefUrl, `${JSON.stringify(moduleRef, null, 2)}\n`);
+    const check = spawnSync(process.execPath, ['scripts/check-publish-artifact.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /module ref hash is stale/);
+  } finally {
+    await writeFile(moduleRefUrl, original);
+  }
+});
+
 test('publish runnable artifact smoke starts without a dev server', async () => {
   const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
     cwd: repoRoot,
@@ -772,6 +991,84 @@ test('publish runnable artifact smoke starts without a dev server', async () => 
   assert.equal(smoke.commandProof.rejectedCommand.diagnostics[0].code, 'command_rejected');
   assert.ok(smoke.checks.includes('no_devtools_endpoint_required'));
   assert.ok(smoke.checks.includes('packaged_runtime_accepted_command_mutated_projection'));
+});
+
+test('publish backend artifact smoke starts without a dev server', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const result = spawnSync('npm', ['run', 'publish:backend-run-smoke'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/publish-backend-run-smoke\/latest\/index\.json/);
+  const smoke = JSON.parse(await readFile(new URL('../harness/out/publish-backend-run-smoke/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(smoke.artifactKind, 'asha_demo_publish_backend_run_smoke');
+  assert.equal(smoke.noDevServerRequired, true);
+  assert.equal(smoke.runtimeBackedArtifact.target, 'asha-demo-staged-backend-native.v2');
+  assert.equal(smoke.runtime.runtimeMode, 'native');
+  assert.equal(smoke.runtime.launcherName, 'native-game-runtime-launcher');
+  assert.equal(smoke.resolvedResources.length, 3);
+  assert.match(smoke.projection.worldHash, /^native-world:/);
+  assert.equal(smoke.commandProof.acceptedCommand.status, 'accepted');
+  assert.notEqual(
+    smoke.commandProof.acceptedCommand.authorityHashBefore,
+    smoke.commandProof.acceptedCommand.authorityHashAfter,
+  );
+  assert.equal(smoke.commandProof.rejectedCommand.status, 'rejected');
+  assert.equal(
+    smoke.commandProof.rejectedCommand.authorityHashBefore,
+    smoke.commandProof.rejectedCommand.authorityHashAfter,
+  );
+  assert.ok(smoke.checks.includes('reference_runtime_fallback_rejected'));
+  assert.ok(smoke.checks.includes('native_backend_accepted_command_mutated_projection'));
+});
+
+test('publish backend artifact smoke rejects reference fallback claiming backend mode', async () => {
+  const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
+  const runtimeMetadataUrl = new URL('../harness/out/publish/backend-native/latest/runtime/runtime-metadata.json', import.meta.url);
+  const readbackUrl = new URL('../harness/out/publish/backend-native/latest/readback/index.json', import.meta.url);
+  const originalArtifact = await readFile(artifactUrl, 'utf8');
+  const originalRuntimeMetadata = await readFile(runtimeMetadataUrl, 'utf8');
+  const originalReadback = await readFile(readbackUrl, 'utf8');
+  try {
+    const runtimeMetadata = JSON.parse(originalRuntimeMetadata);
+    runtimeMetadata.runtimeMode = 'reference';
+    runtimeMetadata.launcherName = 'reference-game-runtime-launcher';
+    const nextRuntimeMetadata = `${JSON.stringify(runtimeMetadata, null, 2)}\n`;
+    await writeFile(runtimeMetadataUrl, nextRuntimeMetadata);
+
+    const readback = JSON.parse(originalReadback);
+    readback.runtimeMetadataHash = sha256(nextRuntimeMetadata);
+    const nextReadback = `${JSON.stringify(readback, null, 2)}\n`;
+    await writeFile(readbackUrl, nextReadback);
+
+    const artifact = JSON.parse(originalArtifact);
+    artifact.runtimeBackedArtifact.runtimeMetadataHash = sha256(nextRuntimeMetadata);
+    artifact.runtimeBackedArtifact.readbackHash = sha256(nextReadback);
+    await writeFile(artifactUrl, `${JSON.stringify(rehashPublishArtifact(artifact), null, 2)}\n`);
+
+    const result = spawnSync(process.execPath, ['scripts/run-publish-backend-run-smoke.mjs'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      timeout: 30000,
+    });
+    assert.notEqual(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stderr + result.stdout, /rejects reference runtime fallback|native/);
+  } finally {
+    await writeFile(runtimeMetadataUrl, originalRuntimeMetadata);
+    await writeFile(readbackUrl, originalReadback);
+    await writeFile(artifactUrl, originalArtifact);
+  }
 });
 
 test('publish runnable artifact smoke fails when entrypoint is missing', async () => {
@@ -808,15 +1105,25 @@ test('publish evidence manifest validates build smoke and dependency guard corre
   assert.equal(evidence.publishSmoke.readback.publishDependencyGuard, 'no-studio-dev-only-fragments');
   assert.equal(evidence.publishRunSmoke.runtime.runtimeMode, 'reference');
   assert.equal(evidence.publishRunSmoke.commandProof.acceptedCommand.status, 'accepted');
+  assert.equal(evidence.publishBackendRunSmoke.runtime.runtimeMode, 'native');
+  assert.equal(evidence.publishBackendRunSmoke.commandProof.acceptedCommand.status, 'accepted');
+  assert.equal(evidence.publishBackendRunSmoke.commandProof.rejectedCommand.status, 'rejected');
+  assert.equal(evidence.publishBackendRunSmoke.noDevServerRequired, true);
   assert.ok(evidence.validations.includes('publish_artifact_hash_matches_readback'));
   assert.ok(evidence.validations.includes('runtime_projection_readback_present'));
   assert.ok(evidence.validations.includes('packaged_command_proof_present'));
+  assert.ok(evidence.validations.includes('backend_runtime_projection_readback_present'));
+  assert.ok(evidence.validations.includes('backend_packaged_command_proof_present'));
+  assert.ok(evidence.validations.includes('backend_no_dev_server_smoke_passed'));
   assert.ok(evidence.validations.includes('studio_dev_only_dependency_guard_passed'));
   assert.deepEqual(evidence.nonClaims, [
     'not_native_runtime_authority',
+    'not_wasm_authority',
     'not_hardware_gpu_evidence',
     'not_performance_evidence',
     'not_store_submission',
+    'not_installer',
+    'not_package_signing',
   ]);
   assert.match(evidence.evidenceId, /^asha-demo-publish-evidence:sha256:/);
   assert.match(evidence.evidenceHash, /^sha256:/);
@@ -851,6 +1158,52 @@ test('publish evidence readback fails closed on missing launch projection', asyn
   }
 });
 
+test('publish evidence readback fails closed on stale backend smoke hash', async () => {
+  const generate = spawnSync(process.execPath, ['scripts/generate-publish-evidence.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(generate.status, 0, generate.stdout + generate.stderr);
+  const evidenceUrl = new URL('../harness/out/publish-evidence/latest/index.json', import.meta.url);
+  const badUrl = new URL('../harness/out/publish-evidence/latest/bad-stale-backend-smoke.json', import.meta.url);
+  const evidence = JSON.parse(await readFile(evidenceUrl, 'utf8'));
+  evidence.publishBackendRunSmoke.fileHash = 'sha256:stale';
+  await writeFile(badUrl, `${JSON.stringify(evidence, null, 2)}\n`);
+  try {
+    const check = spawnSync(process.execPath, ['scripts/check-publish-evidence.mjs', 'harness/out/publish-evidence/latest/bad-stale-backend-smoke.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /backend run smoke child artifact hash is stale/);
+  } finally {
+    await rm(badUrl, { force: true });
+  }
+});
+
+test('publish evidence readback fails closed on missing backend proof refs', async () => {
+  const generate = spawnSync(process.execPath, ['scripts/generate-publish-evidence.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(generate.status, 0, generate.stdout + generate.stderr);
+  const evidenceUrl = new URL('../harness/out/publish-evidence/latest/index.json', import.meta.url);
+  const badUrl = new URL('../harness/out/publish-evidence/latest/bad-missing-backend-proof-refs.json', import.meta.url);
+  const evidence = JSON.parse(await readFile(evidenceUrl, 'utf8'));
+  evidence.publishBackendRunSmoke.runtimeBackedArtifact.backendProofRefs = [];
+  await writeFile(badUrl, `${JSON.stringify(evidence, null, 2)}\n`);
+  try {
+    const check = spawnSync(process.execPath, ['scripts/check-publish-evidence.mjs', 'harness/out/publish-evidence/latest/bad-missing-backend-proof-refs.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /backend proof refs|proof refs/);
+  } finally {
+    await rm(badUrl, { force: true });
+  }
+});
+
 test('aggregate game workflow verification gates dev Studio attach and publish', async () => {
   await rm(new URL('../harness/out/game-workflow/', import.meta.url), { recursive: true, force: true });
   const result = spawnSync(process.execPath, ['scripts/verify-game-workflow.mjs'], {
@@ -874,6 +1227,7 @@ test('aggregate game workflow verification gates dev Studio attach and publish',
   assert.equal(artifact.artifacts.assetsV1.resourcePackEntryCount, 3);
   assert.equal(artifact.artifacts.assetsV1.inventoryEntryCount, 3);
   assert.match(artifact.artifacts.publishEvidence.evidenceHash, /^sha256:/);
+  assert.equal(artifact.artifacts.publishEvidence.backendRunSmokeRuntimeMode, 'native');
   assert.ok(artifact.validations.includes('devtools_attach_smoke_passed'));
   assert.ok(artifact.validations.includes('assets_v1_verification_passed'));
   assert.ok(artifact.validations.includes('studio_attach_tests_passed'));
@@ -915,6 +1269,8 @@ test('aggregate V1 workflow verification records runtime assets publish and Stud
   assert.equal(artifact.artifacts.publish.publishTarget, 'asha-demo-static-reference.v1');
   assert.equal(artifact.artifacts.publish.dependencyGuard, 'no-studio-dev-only-fragments');
   assert.equal(artifact.artifacts.publish.runSmokeRuntimeMode, 'reference');
+  assert.equal(artifact.artifacts.publish.backendRunSmokeRuntimeMode, 'native');
+  assert.equal(artifact.artifacts.publish.backendRunSmokeTarget, 'asha-demo-staged-backend-native.v2');
   assert.equal(artifact.artifacts.studio.cockpitArtifactKind, 'studio_workspace_cockpit_evidence');
   assert.ok(artifact.artifacts.studio.markers.includes('studio-workspace-cockpit-evidence'));
   assert.ok(artifact.validations.includes('runtime_authority_child_hashes_fresh'));
@@ -922,6 +1278,34 @@ test('aggregate V1 workflow verification records runtime assets publish and Stud
   assert.ok(artifact.validations.includes('studio_cockpit_markers_present'));
   assert.ok(artifact.nonClaims.includes('not_studio_publish_builder'));
   assert.match(artifact.artifactId, /^asha-demo-game-workflow-v1:sha256:/);
+});
+
+test('aggregate V2 workflow verification records proof index and backend publish evidence', async () => {
+  await rm(new URL('../harness/out/game-workflow-v2/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync('npm', ['run', 'verify:workflow:v2'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/game-workflow-v2\/latest\/index\.json/);
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/game-workflow-v2/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_game_workflow_v2_verification');
+  assert.equal(artifact.artifactVersion, 'game-workflow-v2-verification.v1');
+  assert.equal(artifact.commands.manifest.status, 'passed');
+  assert.equal(artifact.commands.demoBoundary.status, 'passed');
+  assert.equal(artifact.commands.v2ProofIndex.status, 'passed');
+  assert.equal(artifact.commands.v2ProofIndexCheck.status, 'passed');
+  assert.match(artifact.artifacts.proofIndex.indexHash, /^sha256:/);
+  assert.equal(artifact.artifacts.backendAuthority.runtimeMode, 'native');
+  assert.deepEqual(artifact.artifacts.backendAuthority.backendProofRefs, ['proof:dev-authority-smoke']);
+  assert.equal(artifact.artifacts.publishBackend.backendMode, 'native');
+  assert.equal(artifact.artifacts.publishBackend.backendProfile, 'native.napi.launcher.v1');
+  assert.equal(artifact.artifacts.publishBackend.dependencyGuard, 'no-studio-dev-only-fragments');
+  assert.equal(artifact.artifacts.aggregateV1.remainsRunnable, true);
+  assert.ok(artifact.validations.includes('v2_proof_index_check_passed'));
+  assert.ok(artifact.validations.includes('v1_aggregate_remains_runnable'));
+  assert.match(artifact.artifactId, /^asha-demo-game-workflow-v2:sha256:/);
 });
 
 test('backend authority smoke records selected native command and hash evidence', async () => {
@@ -1016,6 +1400,101 @@ test('publish artifact checker fails closed on stale artifact hashes', async () 
     assert.match(check.stderr + check.stdout, /sha256:stale/);
   } finally {
     await writeFile(artifactUrl, original);
+  }
+});
+
+test('runtime-backed publish target V2 doc pins staged backend layout and non-claims', async () => {
+  const doc = await readFile(new URL('../docs/runtime-backed-publish-target-v2.md', import.meta.url), 'utf8');
+  const workflow = await readFile(new URL('../docs/game-workflow.md', import.meta.url), 'utf8');
+
+  assert.match(doc, /asha-demo-staged-backend-native\.v2/);
+  assert.match(doc, /harness\/out\/publish\/backend-native\/latest\//);
+  assert.match(doc, /runtime\/runtime-metadata\.json/);
+  assert.match(doc, /resources\/manifest\.json/);
+  assert.match(doc, /backend-authority-smoke\.json/);
+  assert.match(doc, /dev-runtime-command-evidence\.json/);
+  assert.match(doc, /no-dev-server smoke/i);
+  assert.match(doc, /fail closed/i);
+  assert.match(doc, /not_store_submission/);
+  assert.match(doc, /not_installer/);
+  assert.match(doc, /not_private_runtime_transport/);
+  assert.match(doc, /WASM remains a deferred target/);
+  assert.match(workflow, /runtime-backed-publish-target-v2\.md/);
+});
+
+test('V2 proof index records backend Studio publish and aggregate evidence refs', async () => {
+  const result = spawnSync('npm', ['run', 'proof:v2-index'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/v2-proof-index\/latest\/index\.json/);
+  const index = JSON.parse(await readFile(new URL('../harness/out/v2-proof-index/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(index.artifactKind, 'asha_demo_v2_proof_index');
+  assert.equal(index.campaign.parentTaskId, 3697);
+  assert.equal(index.runtime.mode, 'native');
+  assert.deepEqual(index.runtime.backendProofRefs, ['proof:dev-authority-smoke']);
+  assert.ok(index.proofGroups.backendAuthority.refs.some((ref) => ref.kind === 'backend-authority-smoke'));
+  assert.ok(index.proofGroups.replayHash.refs.some((ref) => ref.kind === 'command-replay'));
+  assert.ok(index.proofGroups.studioLive.refs.some((ref) => ref.kind === 'studio-v2-live-backend-evidence'));
+  assert.ok(index.proofGroups.publishBackend.refs.some((ref) => ref.kind === 'publish-backend-run-smoke'));
+  assert.ok(index.proofGroups.aggregate.refs.some((ref) => ref.kind === 'game-workflow-v1'));
+  assert.equal(index.denIngestableSummary.dataOnly, true);
+  assert.ok(index.nonClaims.includes('not_runtime_den_dependency'));
+  const check = spawnSync('npm', ['run', 'proof:v2-index-check'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(check.status, 0, check.stdout + check.stderr);
+  assert.match(check.stdout, /V2 proof index check: OK/);
+});
+
+test('V2 proof index checker rejects stale child refs', async () => {
+  const generate = spawnSync('npm', ['run', 'proof:v2-index'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(generate.status, 0, generate.stdout + generate.stderr);
+  const indexUrl = new URL('../harness/out/v2-proof-index/latest/index.json', import.meta.url);
+  const badUrl = new URL('../harness/out/v2-proof-index/latest/bad-stale-child.json', import.meta.url);
+  const index = JSON.parse(await readFile(indexUrl, 'utf8'));
+  index.proofGroups.publishBackend.refs[0].sha256 = 'sha256:stale';
+  await writeFile(badUrl, `${JSON.stringify(rehashV2ProofIndex(index), null, 2)}\n`);
+  try {
+    const check = spawnSync(process.execPath, ['scripts/check-v2-proof-index.mjs', 'harness/out/v2-proof-index/latest/bad-stale-child.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /child ref is stale/);
+  } finally {
+    await rm(badUrl, { force: true });
+  }
+});
+
+test('V2 proof index checker rejects missing proof groups', async () => {
+  const generate = spawnSync('npm', ['run', 'proof:v2-index'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(generate.status, 0, generate.stdout + generate.stderr);
+  const indexUrl = new URL('../harness/out/v2-proof-index/latest/index.json', import.meta.url);
+  const badUrl = new URL('../harness/out/v2-proof-index/latest/bad-missing-group.json', import.meta.url);
+  const index = JSON.parse(await readFile(indexUrl, 'utf8'));
+  delete index.proofGroups.studioLive;
+  await writeFile(badUrl, `${JSON.stringify(rehashV2ProofIndex(index), null, 2)}\n`);
+  try {
+    const check = spawnSync(process.execPath, ['scripts/check-v2-proof-index.mjs', 'harness/out/v2-proof-index/latest/bad-missing-group.json'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    assert.notEqual(check.status, 0, check.stdout + check.stderr);
+    assert.match(check.stderr + check.stdout, /missing proof group studioLive/);
+  } finally {
+    await rm(badUrl, { force: true });
   }
 });
 

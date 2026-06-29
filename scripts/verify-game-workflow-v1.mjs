@@ -98,6 +98,7 @@ const publishEvidence = await readArtifact('harness/out/publish-evidence/latest/
 const publishArtifact = await readArtifact('harness/out/publish/latest/index.json');
 const publishSmoke = await readArtifact('harness/out/publish-smoke/latest/index.json');
 const publishRunSmoke = await readArtifact('harness/out/publish-run-smoke/latest/index.json');
+const publishBackendRunSmoke = await readArtifact('harness/out/publish-backend-run-smoke/latest/index.json');
 const studioPanels = await readStudioSource('libs/studio-panels/src/index.ts');
 const studioDomain = await readStudioSource('libs/studio-domain/src/index.ts');
 const studioTests = await readStudioSource('test/substrate-scaffold.test.ts');
@@ -130,9 +131,13 @@ assert.equal(publishEvidence.json.publishSmoke.readback.publishDependencyGuard, 
 assert.equal(publishEvidence.json.publishRunSmoke.runtime.runtimeMode, 'reference');
 assert.equal(publishEvidence.json.publishRunSmoke.commandProof.acceptedCommand.status, 'accepted');
 assert.equal(publishEvidence.json.publishRunSmoke.commandProof.rejectedCommand.status, 'rejected');
+assert.equal(publishEvidence.json.publishBackendRunSmoke.runtime.runtimeMode, 'native');
+assert.equal(publishEvidence.json.publishBackendRunSmoke.commandProof.acceptedCommand.status, 'accepted');
+assert.equal(publishEvidence.json.publishBackendRunSmoke.commandProof.rejectedCommand.status, 'rejected');
 assertHashMatches(publishArtifact, publishEvidence.json.publishArtifact.fileHash, 'publish artifact child artifact');
 assertHashMatches(publishSmoke, publishEvidence.json.publishSmoke.fileHash, 'publish smoke child artifact');
 assertHashMatches(publishRunSmoke, publishEvidence.json.publishRunSmoke.fileHash, 'publish run smoke child artifact');
+assertHashMatches(publishBackendRunSmoke, publishEvidence.json.publishBackendRunSmoke.fileHash, 'publish backend run smoke child artifact');
 
 const studioMarkers = [
   'studio-game-workspace-overview',
@@ -196,6 +201,10 @@ const body = {
       runSmokePath: publishEvidence.json.publishRunSmoke.path,
       runSmokeFileHash: publishEvidence.json.publishRunSmoke.fileHash,
       runSmokeRuntimeMode: publishEvidence.json.publishRunSmoke.runtime.runtimeMode,
+      backendRunSmokePath: publishEvidence.json.publishBackendRunSmoke.path,
+      backendRunSmokeFileHash: publishEvidence.json.publishBackendRunSmoke.fileHash,
+      backendRunSmokeRuntimeMode: publishEvidence.json.publishBackendRunSmoke.runtime.runtimeMode,
+      backendRunSmokeTarget: publishEvidence.json.publishBackendRunSmoke.runtimeBackedArtifact.target,
     },
     studio: {
       cockpitArtifactKind: 'studio_workspace_cockpit_evidence',

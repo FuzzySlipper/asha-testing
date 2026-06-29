@@ -23,14 +23,18 @@
     "devtools:smoke": "node scripts/check-devtools-endpoint.mjs",
     "publish:artifact": "node scripts/build-publish-artifact.mjs",
     "publish:check": "node scripts/check-publish-artifact.mjs",
+    "publish:backend-run-smoke": "node scripts/run-publish-backend-run-smoke.mjs",
     "publish:evidence-check": "node scripts/check-publish-evidence.mjs",
     "publish:evidence": "node scripts/generate-publish-evidence.mjs",
     "publish:run-smoke": "node scripts/run-publish-run-smoke.mjs",
     "publish:smoke": "node scripts/run-publish-smoke.mjs",
+    "proof:v2-index": "node scripts/generate-v2-proof-index.mjs",
+    "proof:v2-index-check": "node scripts/check-v2-proof-index.mjs",
     "scene:proof": "node scripts/check-proof-scenes.mjs",
     "verify:assets-v1": "node scripts/verify-assets-v1.mjs",
     "verify:workflow": "node scripts/verify-game-workflow.mjs",
     "verify:workflow:v1": "node scripts/verify-game-workflow-v1.mjs",
+    "verify:workflow:v2": "node scripts/verify-game-workflow-v2.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs && npm run check:boundary"
   },
   "dependencies": {

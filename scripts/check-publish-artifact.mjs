@@ -31,6 +31,26 @@ const forbiddenPublishFragments = [
   'ws://127.0.0.1',
   'ws://localhost',
 ];
+const forbiddenBackendFragments = [
+  '@asha/native-bridge',
+  'native-bridge.node',
+  '@asha/wasm-replay-bridge',
+  'engine-rs/',
+  '/engine-rs',
+  '/src/',
+  'reference-game-runtime-launcher',
+  'asha-demo-static-reference.v1',
+  '"runtimeMode": "reference"',
+  'devtools_endpoint',
+  'ws://127.0.0.1',
+  'ws://localhost',
+  'call(methodName',
+  '"methodName"',
+  '"commandJson"',
+  '"arbitraryJson"',
+  '"jsonRpc"',
+  '"call":',
+];
 const forbiddenRunnableResourcePrefixes = ['assets/', 'scenes/', 'packages/game-catalogs/', 'packages/game-policy/', 'replays/'];
 
 function stableJson(value) {
@@ -163,6 +183,85 @@ assert.deepEqual(artifact.nonClaims, [
   'not_performance_evidence',
   'not_store_submission',
 ]);
+assert.equal(artifact.runtimeBackedArtifact.target, 'asha-demo-staged-backend-native.v2');
+assert.equal(artifact.runtimeBackedArtifact.backendMode, 'native');
+assert.equal(artifact.runtimeBackedArtifact.backendProfile, parsed.manifest.runtime.backendProfile);
+assert.deepEqual(
+  artifact.runtimeBackedArtifact.backendProofRefs,
+  parsed.manifest.runtime.backendProofRefs,
+  'runtime-backed artifact backend proof refs must match manifest backend proof refs',
+);
+assert.ok(artifact.runtimeBackedArtifact.backendProofRefs.length > 0, 'runtime-backed artifact requires backend proof refs');
+const backendReadbackText = await readFile(path.join(repoRoot, artifact.runtimeBackedArtifact.readbackPath), 'utf8');
+const backendRuntimeMetadataText = await readFile(path.join(repoRoot, artifact.runtimeBackedArtifact.runtimeMetadataPath), 'utf8');
+const backendProfileText = await readFile(path.join(repoRoot, artifact.runtimeBackedArtifact.backendProfilePath), 'utf8');
+const moduleRefText = await readFile(path.join(repoRoot, artifact.runtimeBackedArtifact.moduleRefPath), 'utf8');
+const backendResourceManifestText = await readFile(path.join(repoRoot, artifact.runtimeBackedArtifact.resourceManifestPath), 'utf8');
+assert.equal(artifact.runtimeBackedArtifact.readbackHash, sha256(backendReadbackText));
+assert.equal(artifact.runtimeBackedArtifact.runtimeMetadataHash, sha256(backendRuntimeMetadataText), 'runtime-backed runtime metadata hash is stale');
+assert.equal(artifact.runtimeBackedArtifact.backendProfileHash, sha256(backendProfileText), 'runtime-backed backend profile hash is stale');
+assert.equal(artifact.runtimeBackedArtifact.moduleRefHash, sha256(moduleRefText), 'runtime-backed module ref hash is stale');
+assert.equal(artifact.runtimeBackedArtifact.resourceManifestHash, sha256(backendResourceManifestText), 'runtime-backed resource manifest hash is stale');
+const backendReadback = JSON.parse(backendReadbackText);
+const backendRuntimeMetadata = JSON.parse(backendRuntimeMetadataText);
+const backendProfileReadback = JSON.parse(backendProfileText);
+const moduleRefReadback = JSON.parse(moduleRefText);
+const backendResourceManifest = JSON.parse(backendResourceManifestText);
+assert.equal(backendReadback.target, 'asha-demo-staged-backend-native.v2');
+assert.equal(backendReadback.runtimeMetadataHash, artifact.runtimeBackedArtifact.runtimeMetadataHash);
+assert.equal(backendReadback.backendProfileHash, artifact.runtimeBackedArtifact.backendProfileHash);
+assert.equal(backendReadback.moduleRefHash, artifact.runtimeBackedArtifact.moduleRefHash);
+assert.equal(backendRuntimeMetadata.runtimeMode, 'native');
+assert.equal(backendRuntimeMetadata.launcherName, 'native-game-runtime-launcher');
+assert.equal(backendRuntimeMetadata.world.bundleSchemaVersion, 1);
+assert.equal(backendRuntimeMetadata.world.protocolVersion, 1);
+assert.equal(typeof backendRuntimeMetadata.world.sceneId, 'number');
+assert.equal(backendProfileReadback.backendMode, 'native');
+assert.deepEqual(
+  backendProfileReadback.backendProofRefs,
+  parsed.manifest.runtime.backendProofRefs,
+  'runtime-backed profile backend proof refs must match manifest backend proof refs',
+);
+assert.equal(moduleRefReadback.kind, 'public-runtime-bridge-module-ref');
+assert.equal(moduleRefReadback.moduleRef, parsed.manifest.runtime.wasmOrNativeEntry);
+assert.equal(
+  moduleRefReadback.moduleRefHash,
+  sha256(readFileSync(path.join(repoRoot, parsed.manifest.runtime.wasmOrNativeEntry), 'utf8')),
+  'runtime-backed module file hash is stale',
+);
+assert.equal(backendResourceManifest.target, 'asha-demo-staged-backend-native.v2');
+assert.deepEqual(backendResourceManifest.dependencyOrder, artifact.publishAssets.dependencyOrder);
+assert.equal(backendResourceManifest.entries.length, artifact.runtimeBackedArtifact.resourceEntryCount);
+assert.equal(backendReadback.resourceManifestHash, artifact.runtimeBackedArtifact.resourceManifestHash);
+assert.deepEqual(backendReadback.evidenceRefs.map(ref => ref.kind), [
+  'backend-authority-smoke',
+  'dev-runtime-command-evidence',
+  'publish-artifact',
+  'publish-smoke',
+  'dependency-guard',
+]);
+assert.deepEqual(backendReadback.nonClaims, [
+  'not_wasm_authority',
+  'not_hardware_gpu_evidence',
+  'not_performance_evidence',
+  'not_store_submission',
+  'not_installer',
+  'not_package_signing',
+  'not_private_runtime_transport',
+]);
+for (const ref of backendReadback.evidenceRefs) {
+  const text = await readFile(path.join(repoRoot, ref.path), 'utf8');
+  assert.equal(ref.sha256, sha256(text), `${ref.kind} evidence ref is stale`);
+}
+const backendFiles = walkFiles(path.join(repoRoot, artifact.runtimeBackedArtifact.directory));
+for (const file of backendFiles) {
+  const text = await readFile(file, 'utf8');
+  for (const fragment of forbiddenBackendFragments) {
+    if (text.includes(fragment)) {
+      fail(`runtime-backed artifact file ${path.relative(repoRoot, file)} contains forbidden fragment "${fragment}"`);
+    }
+  }
+}
 
 const packedResources = [];
 for (const entry of artifact.publishAssets.entries) {
@@ -201,6 +300,17 @@ for (const entry of artifact.publishAssets.entries) {
     runnableHash: runnablePacked.hash,
   });
 }
+for (const entry of backendResourceManifest.entries) {
+  assert.ok(entry.path.startsWith('resources/'), `runtime-backed resource ${entry.assetId} must stay under resources/ via ${entry.path}`);
+  assert.equal(path.normalize(entry.path), entry.path, `runtime-backed resource ${entry.assetId} uses non-normalized path ${entry.path}`);
+  assert.ok(!entry.path.includes('..'), `runtime-backed resource ${entry.assetId} escapes artifact directory via ${entry.path}`);
+  for (const prefix of forbiddenRunnableResourcePrefixes) {
+    assert.ok(!entry.path.startsWith(prefix), `runtime-backed resource ${entry.assetId} reads dev-local source root via ${entry.path}`);
+  }
+  const packedText = await readFile(path.join(repoRoot, artifact.runtimeBackedArtifact.directory, entry.path), 'utf8');
+  assert.equal(entry.packedHash, sha256(packedText));
+  assert.equal(entry.packedBytes, Buffer.byteLength(packedText));
+}
 
 const summary = {
   status: 'ok',
@@ -215,11 +325,25 @@ const summary = {
     outputDir: 'publish_resource_profile.output_dir',
     runnableDirectory: artifact.runnableArtifact.directory,
     resourceManifestPath: artifact.runnableArtifact.resourceManifestPath,
+    runtimeBackedDirectory: artifact.runtimeBackedArtifact.directory,
+    runtimeBackedManifestPath: artifact.runtimeBackedArtifact.resourceManifestPath,
+  },
+  runtimeBackedArtifact: {
+    target: artifact.runtimeBackedArtifact.target,
+    backendMode: artifact.runtimeBackedArtifact.backendMode,
+    backendProfile: artifact.runtimeBackedArtifact.backendProfile,
+    backendProofRefs: artifact.runtimeBackedArtifact.backendProofRefs,
+    readbackPath: artifact.runtimeBackedArtifact.readbackPath,
+    readbackHash: artifact.runtimeBackedArtifact.readbackHash,
+    runtimeMetadataPath: artifact.runtimeBackedArtifact.runtimeMetadataPath,
+    resourceManifestPath: artifact.runtimeBackedArtifact.resourceManifestPath,
   },
   packedResources,
   dependencyGuard: {
     inspectedRunnableFiles: runnableFiles.map((file) => path.relative(repoRoot, file)),
+    inspectedBackendFiles: backendFiles.map((file) => path.relative(repoRoot, file)),
     forbiddenFragments: forbiddenPublishFragments,
+    forbiddenBackendFragments,
   },
 };
 
