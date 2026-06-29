@@ -1868,6 +1868,59 @@ test('browser interactive aggregate proof records launch input and replay eviden
   assert.ok(artifact.nonClaims.includes('not_runtime_authority'));
 });
 
+test('authored round-trip fixture loads into browser runtime readback', async () => {
+  assert.equal(packageJson.scripts['roundtrip:runtime-load'], 'node scripts/run-authored-runtime-load.mjs');
+  const result = spawnSync('npm', ['run', 'roundtrip:runtime-load'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /authored-runtime-load-ready/);
+
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/authored-runtime-load/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_authored_runtime_load');
+  assert.equal(artifact.fixture.fixtureVersion, 'studio-authored-roundtrip-fixture.v0');
+  assert.equal(artifact.authoredRuntimeLoad.objectId, 'scene-node:9401');
+  assert.equal(artifact.authoredRuntimeLoad.assetId, 'material.studio-authored-roundtrip');
+  assert.equal(artifact.runtime.runtimeMode, 'reference');
+  assert.match(artifact.runtime.resourceManifestHash, /^sha256:/);
+  assert.equal(artifact.browser.loadedObjectId, artifact.authoredRuntimeLoad.objectId);
+  assert.equal(artifact.browser.loadedAssetId, artifact.authoredRuntimeLoad.assetId);
+  assert.ok(artifact.validations.includes('runtime_launched_through_public_runtime_bridge'));
+  assert.ok(artifact.validations.includes('browser_page_loaded_with_authored_readback'));
+  assert.equal(artifact.negativeSmokes.at(0)?.ok, false);
+  assert.equal(artifact.negativeSmokes.at(1)?.ok, false);
+  assert.ok(artifact.nonClaims.includes('not_browser_interaction_evidence'));
+});
+
+test('authored browser interaction dispatches DOM input against loaded content', async () => {
+  assert.equal(packageJson.scripts['roundtrip:browser-interaction'], 'node scripts/run-authored-browser-interaction.mjs');
+  const result = spawnSync('npm', ['run', 'roundtrip:browser-interaction'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /authored-browser-interaction-ready/);
+
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/authored-browser-interaction/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_authored_browser_interaction');
+  assert.equal(artifact.interaction.authoredObjectId, 'scene-node:9401');
+  assert.equal(artifact.interaction.authoredAssetId, 'material.studio-authored-roundtrip');
+  assert.equal(artifact.interaction.inputEventCount, 3);
+  assert.equal(artifact.interaction.typedRequestCount, artifact.interaction.inputEventCount);
+  assert.equal(artifact.interaction.readbackCount, artifact.interaction.typedRequestCount);
+  assert.equal(artifact.interaction.finalReadback.selectedObjectId, artifact.interaction.authoredObjectId);
+  assert.ok(artifact.interaction.inputEvents.some((event) => event.source === 'pointer'));
+  assert.ok(artifact.interaction.inputEvents.some((event) => event.source === 'keyboard'));
+  assert.ok(artifact.interaction.inputEvents.some((event) => event.source === 'wheel'));
+  assert.ok(artifact.validations.includes('authored_selection_readback_matches_loaded_object'));
+  assert.equal(artifact.negativeSmokes.at(0)?.ok, false);
+  assert.equal(artifact.negativeSmokes.at(1)?.ok, false);
+  assert.ok(artifact.nonClaims.includes('not_runtime_mutation_proof'));
+});
+
 test('M3 browser interactive closeout records aggregate proof path and non-claims', async () => {
   const doc = await readFile(new URL('../docs/demo-proof-m3-browser-interactive-closeout.md', import.meta.url), 'utf8');
   assert.match(doc, /npm run browser:interactive-proof/);

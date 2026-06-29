@@ -13,6 +13,8 @@
     "browser:input-proof": "node scripts/run-browser-input-proof.mjs",
     "browser:input-correlation": "node scripts/run-browser-input-correlation.mjs",
     "browser:interactive-proof": "node scripts/run-browser-interactive-proof.mjs",
+    "roundtrip:runtime-load": "node scripts/run-authored-runtime-load.mjs",
+    "roundtrip:browser-interaction": "node scripts/run-authored-browser-interaction.mjs",
     "voxel:interaction": "node scripts/run-voxel-interaction.mjs",
     "check:boundary": "node scripts/check-boundary.mjs",
     "check:assets": "node scripts/check-assets.mjs",
