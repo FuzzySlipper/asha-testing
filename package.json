@@ -29,6 +29,7 @@
     "scene:proof": "node scripts/check-proof-scenes.mjs",
     "verify:assets-v1": "node scripts/verify-assets-v1.mjs",
     "verify:workflow": "node scripts/verify-game-workflow.mjs",
+    "verify:workflow:v1": "node scripts/verify-game-workflow-v1.mjs",
     "test": "node --test --test-concurrency=1 tests/*.test.mjs && npm run check:boundary"
   },
   "dependencies": {

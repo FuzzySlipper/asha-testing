@@ -876,6 +876,48 @@ test('aggregate game workflow verification gates dev Studio attach and publish',
   assert.match(artifact.artifactId, /^asha-demo-game-workflow:sha256:/);
 });
 
+test('aggregate V1 workflow verification records runtime assets publish and Studio cockpit evidence', async () => {
+  await rm(new URL('../harness/out/game-workflow-v1/', import.meta.url), { recursive: true, force: true });
+  const result = spawnSync('npm', ['run', 'verify:workflow:v1'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 120000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /wrote harness\/out\/game-workflow-v1\/latest\/index\.json/);
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/game-workflow-v1/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_game_workflow_v1_verification');
+  assert.equal(artifact.artifactVersion, 'game-workflow-v1-verification.v1');
+  assert.equal(artifact.commands.runtimeAuthoritySmoke.status, 'passed');
+  assert.equal(artifact.commands.assetsV1.status, 'passed');
+  assert.equal(artifact.commands.publishEvidence.status, 'passed');
+  assert.equal(artifact.commands.publishEvidenceCheck.status, 'passed');
+  assert.equal(artifact.commands.studioTests.status, 'passed');
+  assert.equal(artifact.commands.studioBoundaries.status, 'passed');
+  assert.equal(artifact.commands.studioTypecheck.status, 'passed');
+  assert.equal(artifact.artifacts.runtimeAuthority.runtimeMode, 'reference');
+  assert.notEqual(
+    artifact.artifacts.runtimeAuthority.acceptedAuthorityHashBefore,
+    artifact.artifacts.runtimeAuthority.acceptedAuthorityHashAfter,
+  );
+  assert.equal(
+    artifact.artifacts.runtimeAuthority.rejectedAuthorityHashBefore,
+    artifact.artifacts.runtimeAuthority.rejectedAuthorityHashAfter,
+  );
+  assert.equal(artifact.artifacts.assets.resourcePackEntryCount, 3);
+  assert.equal(artifact.artifacts.assets.inventoryEntryCount, 3);
+  assert.equal(artifact.artifacts.publish.publishTarget, 'asha-demo-static-reference.v1');
+  assert.equal(artifact.artifacts.publish.dependencyGuard, 'no-studio-dev-only-fragments');
+  assert.equal(artifact.artifacts.publish.runSmokeRuntimeMode, 'reference');
+  assert.equal(artifact.artifacts.studio.cockpitArtifactKind, 'studio_workspace_cockpit_evidence');
+  assert.ok(artifact.artifacts.studio.markers.includes('studio-workspace-cockpit-evidence'));
+  assert.ok(artifact.validations.includes('runtime_authority_child_hashes_fresh'));
+  assert.ok(artifact.validations.includes('publish_child_hashes_fresh'));
+  assert.ok(artifact.validations.includes('studio_cockpit_markers_present'));
+  assert.ok(artifact.nonClaims.includes('not_studio_publish_builder'));
+  assert.match(artifact.artifactId, /^asha-demo-game-workflow-v1:sha256:/);
+});
+
 test('publish artifact checker fails closed on stale artifact hashes', async () => {
   const artifactUrl = new URL('../harness/out/publish/latest/index.json', import.meta.url);
   const build = spawnSync(process.execPath, ['scripts/build-publish-artifact.mjs'], {

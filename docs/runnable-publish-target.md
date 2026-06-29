@@ -34,17 +34,17 @@ The runnable entrypoint is `index.html`. It loads only static files from the art
 directory and displays the reference runtime projection/evidence readback. The target
 uses `runtimeMode: "reference"` until a later native/runtime-bridge proof is approved.
 
-## Relationship To V0 Publish
+## Relationship To Publish Readback
 
-V0 publish currently writes a deterministic JSON readback at:
+The publish pipeline still writes a deterministic JSON readback at:
 
 ```text
 harness/out/publish/latest/index.json
 ```
 
-That artifact is still useful, but it is not runnable. V1 keeps the JSON readback as
-an evidence input and adds a runnable static layout around the same manifest, resource
-profile, asset manifest, hashes, non-claims, and smoke results.
+That artifact is an evidence input and index for the runnable target. V1 adds a
+static layout under `harness/out/publish/runnable/latest/` around the same manifest,
+resource profile, asset manifest, hashes, non-claims, and smoke results.
 
 ## Required Manifest Inputs
 
@@ -60,10 +60,10 @@ static runnable may copy packed resources, but it must not load `assets/`,
 
 ## Smoke Expectations
 
-The V1 runnable smoke should:
+The V1 runnable smoke does:
 
 - serve `harness/out/publish/runnable/latest/` over local HTTP;
-- open `index.html` with a headless browser or HTTP-only readback checker;
+- open `index.html` with an HTTP-only readback checker;
 - verify the resource manifest, packed asset hashes, and runtime projection marker;
 - prove `runtimeMode: "reference"` with explicit non-claims;
 - fail closed if any static file references dev-only source roots or Studio attach paths.
