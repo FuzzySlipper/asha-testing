@@ -33,7 +33,8 @@ assert.ok(Array.isArray(evidence.commandReceipts));
 assert.ok(evidence.commandReceipts.length >= 2);
 
 for (const receipt of evidence.commandReceipts) {
-  assert.equal(typeof receipt.sequenceId, 'number');
+  assert.equal(typeof receipt.sequenceId, 'string');
+  assert.ok(receipt.sequenceId.length > 0, 'sequenceId must be non-empty');
   assert.equal(typeof receipt.authorityHashBefore, 'string', 'authorityHashBefore must be present');
   assert.equal(typeof receipt.authorityHashAfter, 'string', 'authorityHashAfter must be present');
   assert.ok(receipt.authorityHashBefore.length > 0, 'authorityHashBefore must be non-empty');

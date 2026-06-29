@@ -182,7 +182,7 @@ async function handleMessage(message) {
       {
         const proposal = await runtimeSession.proposeCommands(message.batch);
         commandReceipts.push({
-          sequenceId: proposal.sequenceId,
+          sequenceId: message.sequenceId,
           batch: message.batch,
           status: proposal.status,
           result: proposal.result,
@@ -194,7 +194,7 @@ async function handleMessage(message) {
           type: 'command.result',
           proposal: {
             status: proposal.status,
-            sequenceId: proposal.sequenceId,
+            sequenceId: message.sequenceId,
             result: proposal.result,
             reason: proposal.status === 'rejected' ? 'authority_rejected' : proposal.status === 'failed' ? 'runtime_unavailable' : undefined,
             authorityHashBefore: proposal.authorityHashBefore,

@@ -961,13 +961,13 @@ test('dev runtime evidence checker rejects native claims with reference hashes',
     nonClaims: ['not_wasm_authority'],
     commandReceipts: [
       {
-        sequenceId: 1,
+        sequenceId: 'seq-1',
         status: 'accepted',
         authorityHashBefore: 'reference-authority:workspace.local:1001:accepted:0',
         authorityHashAfter: 'reference-authority:workspace.local:1001:accepted:1',
       },
       {
-        sequenceId: 2,
+        sequenceId: 'seq-2',
         status: 'rejected',
         authorityHashBefore: 'reference-authority:workspace.local:1001:accepted:1',
         authorityHashAfter: 'reference-authority:workspace.local:1001:accepted:1',
