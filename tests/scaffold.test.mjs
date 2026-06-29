@@ -1744,6 +1744,138 @@ test('V2 proof index checker rejects missing proof groups', async () => {
   }
 });
 
+test('browser demo launch target emits a standalone page and launch artifact', async () => {
+  assert.equal(packageJson.scripts['browser:demo'], 'node scripts/run-browser-demo-launch.mjs');
+  const result = spawnSync('npm', ['run', 'browser:demo'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 120000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /browser-demo-launch-ready/);
+
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/browser-demo/latest/index.json', import.meta.url), 'utf8'));
+  const page = await readFile(new URL('../harness/out/browser-demo/latest/index.html', import.meta.url), 'utf8');
+  assert.equal(artifact.artifactKind, 'asha_demo_browser_launch_target');
+  assert.equal(artifact.page.path, 'harness/out/browser-demo/latest/index.html');
+  assert.equal(artifact.checks.boundaryCheck.status, 'passed');
+  assert.equal(artifact.checks.pageImportsStudio, false);
+  assert.equal(artifact.checks.acceptsArbitraryCommandHatch, false);
+  assert.deepEqual(artifact.controlSurface.acceptedInputSources, ['keyboard', 'pointer', 'wheel']);
+  assert.deepEqual(artifact.controlSurface.missingOperations, []);
+  assert.ok(artifact.controlSurface.typedMappings.some((mapping) => mapping.operation === 'selectVoxel'));
+  assert.ok(artifact.controlSurface.typedMappings.some((mapping) => mapping.operation === 'applyFirstPersonCameraInput'));
+  assert.equal(artifact.gameplayLoop.loopDriver, 'requestAnimationFrame');
+  assert.equal(artifact.gameplayLoop.consumesTypedRequestSequences, true);
+  assert.equal(artifact.gameplayLoop.mutationBoundary, 'browser-local-readback-only');
+  assert.ok(artifact.validations.includes('browser_page_written'));
+  assert.ok(artifact.validations.includes('runtime_launched_through_public_runtime_bridge'));
+  assert.ok(artifact.validations.includes('browser_controls_registered'));
+  assert.ok(artifact.validations.includes('typed_control_mapping_declared'));
+  assert.ok(artifact.validations.includes('browser_gameplay_loop_registered'));
+  assert.ok(artifact.validations.includes('typed_requests_drive_browser_local_readback'));
+  assert.ok(artifact.nonClaims.includes('not_browser_input_proof'));
+  assert.ok(artifact.nonClaims.includes('not_runtime_mutation_proof'));
+  assert.match(page, /data-asha-browser-demo-ready="true"/);
+  assert.match(page, /data-browser-controls-ready="true"/);
+  assert.match(page, /data-browser-gameplay-loop-ready="true"/);
+  assert.match(page, /browser-demo-launch-ready/);
+  assert.match(page, /window\.ashaDemoBrowserLaunch/);
+  assert.match(page, /addEventListener\('keydown'/);
+  assert.match(page, /addEventListener\('pointerdown'/);
+  assert.match(page, /requestAnimationFrame\(renderGameplayFrame\)/);
+  assert.match(page, /gameplayReadbacks/);
+  assert.match(page, /operation: 'selectVoxel'/);
+  assert.match(page, /operation: 'applyFirstPersonCameraInput'/);
+  assert.equal(page.includes('call(methodName'), false);
+  assert.equal(page.includes('commandJson'), false);
+});
+
+test('browser input proof dispatches DOM events and records typed ASHA requests', async () => {
+  assert.equal(packageJson.scripts['browser:input-proof'], 'node scripts/run-browser-input-proof.mjs');
+  const result = spawnSync('npm', ['run', 'browser:input-proof'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 120000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /browser-input-proof-ready/);
+
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/browser-input-proof/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_browser_input_proof');
+  assert.equal(artifact.browserInput.inputEventCount, artifact.browserInput.typedRequestCount);
+  assert.equal(artifact.browserInput.gameplayReadbackCount, artifact.browserInput.typedRequestCount);
+  assert.ok(artifact.browserInput.inputEvents.some((event) => event.source === 'keyboard'));
+  assert.ok(artifact.browserInput.inputEvents.some((event) => event.source === 'pointer'));
+  assert.ok(artifact.browserInput.inputEvents.some((event) => event.source === 'wheel'));
+  assert.ok(artifact.browserInput.typedRequests.some((request) => request.operation === 'applyFirstPersonCameraInput'));
+  assert.ok(artifact.browserInput.typedRequests.some((request) => request.operation === 'selectVoxel'));
+  assert.equal(artifact.checks.noDirectPageMutationCall, true);
+  assert.equal(artifact.checks.typedRequestsMatchInputEvents, true);
+  assert.equal(artifact.checks.gameplayReadbacksMatchTypedRequests, true);
+  assert.ok(artifact.validations.includes('dom_keyboard_events_dispatched'));
+  assert.ok(artifact.validations.includes('typed_requests_recorded_from_dom_events'));
+  assert.ok(artifact.nonClaims.includes('not_replay_correlated_yet'));
+});
+
+test('browser input correlation records replay and evidence refs', async () => {
+  assert.equal(packageJson.scripts['browser:input-correlation'], 'node scripts/run-browser-input-correlation.mjs');
+  const result = spawnSync('npm', ['run', 'browser:input-correlation'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 120000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /browser-input-correlation-ready/);
+
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/browser-input-correlation/latest/index.json', import.meta.url), 'utf8'));
+  const replay = JSON.parse(await readFile(new URL('../harness/out/browser-input-replay/latest/replay.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_browser_input_correlation');
+  assert.equal(replay.artifactKind, 'asha_demo_browser_input_replay');
+  assert.equal(artifact.evidenceRefs.length, 2);
+  assert.equal(artifact.checks.oneTypedRequestPerInputEvent, true);
+  assert.equal(artifact.checks.oneReadbackPerTypedRequest, true);
+  assert.equal(artifact.checks.sequenceIdsAligned, true);
+  assert.equal(artifact.correlation.frameCount, replay.frames.length);
+  assert.ok(artifact.correlation.operations.includes('selectVoxel'));
+  assert.ok(artifact.correlation.operations.includes('applyFirstPersonCameraInput'));
+  assert.match(artifact.correlation.replayHash, /^sha256:/);
+  assert.ok(artifact.validations.includes('browser_input_replay_written'));
+  assert.ok(artifact.nonClaims.includes('not_command_authority_replay'));
+});
+
+test('browser interactive aggregate proof records launch input and replay evidence', async () => {
+  assert.equal(packageJson.scripts['browser:interactive-proof'], 'node scripts/run-browser-interactive-proof.mjs');
+  const result = spawnSync('npm', ['run', 'browser:interactive-proof'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /browser-interactive-proof-ready/);
+
+  const artifact = JSON.parse(await readFile(new URL('../harness/out/browser-interactive-proof/latest/index.json', import.meta.url), 'utf8'));
+  assert.equal(artifact.artifactKind, 'asha_demo_browser_interactive_proof');
+  assert.equal(artifact.childArtifacts.length, 4);
+  assert.equal(artifact.checks.launchPageReady, true);
+  assert.equal(artifact.checks.domInputProofReady, true);
+  assert.equal(artifact.checks.replayCorrelationReady, true);
+  assert.equal(artifact.checks.boundaryGuardPassed, true);
+  assert.ok(artifact.browserProof.operations.includes('selectVoxel'));
+  assert.ok(artifact.browserProof.operations.includes('applyFirstPersonCameraInput'));
+  assert.match(artifact.browserProof.replayHash, /^sha256:/);
+  assert.ok(artifact.validations.includes('interactive_browser_readback_ready'));
+  assert.ok(artifact.nonClaims.includes('not_runtime_authority'));
+});
+
+test('M3 browser interactive closeout records aggregate proof path and non-claims', async () => {
+  const doc = await readFile(new URL('../docs/demo-proof-m3-browser-interactive-closeout.md', import.meta.url), 'utf8');
+  assert.match(doc, /npm run browser:interactive-proof/);
+  assert.match(doc, /harness\/out\/browser-interactive-proof\/latest\/index\.json/);
+  assert.match(doc, /not a runtime authority claim/);
+  assert.match(doc, /does not depend on `asha-studio`/);
+});
+
 test('headless devtools client fails when endpoint is absent', () => {
   const result = spawnSync(process.execPath, ['scripts/check-devtools-endpoint.mjs', 'ws://127.0.0.1:1'], {
     cwd: repoRoot,
