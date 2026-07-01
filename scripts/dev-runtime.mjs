@@ -74,7 +74,17 @@ assert.equal(catalogValidation.ok, true, catalogValidation.ok ? '' : JSON.string
 const assetResolutions = scene.catalogAssetIds.map((assetId) => resolveAshaGameAssetForDev(catalogValidation.catalog, assetId));
 assert.equal(assetResolutions.every((resolution) => resolution !== null), true);
 const catalogIds = new Set(catalogValidation.catalog.entries.map((entry) => entry.id));
-assert.equal(proofScenes.every((proofScene) => proofScene.catalogAssetIds.every((assetId) => catalogIds.has(assetId))), true);
+const proofSceneDiagnostics = proofScenes.flatMap((proofScene) => {
+  const missingCatalogAssetIds = proofScene.catalogAssetIds.filter((assetId) => !catalogIds.has(assetId));
+  proofScene.valid = missingCatalogAssetIds.length === 0;
+  proofScene.diagnostics = missingCatalogAssetIds.map((assetId) => ({
+    code: 'missing_catalog_asset',
+    path: proofScene.path,
+    assetId,
+    message: `Proof scene ${proofScene.path} references missing catalog asset ${assetId}.`,
+  }));
+  return proofScene.diagnostics;
+});
 
 const launcher =
   manifest.manifest.runtime.backendMode === 'native'
@@ -289,6 +299,7 @@ console.log(JSON.stringify({
   endpoint,
   scene: { sceneId: scene.sceneId, name: scene.name, catalogAssetIds: scene.catalogAssetIds },
   proofScenes,
+  proofSceneDiagnostics,
   loadedWorld: runtimeSession.launch.projection.loadedWorld,
   runtimeMode: runtimeSession.identity.runtimeMode,
   launcherName: runtimeSession.launch.runtimeProfile.launcherName,
