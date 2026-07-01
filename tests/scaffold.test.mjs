@@ -1761,16 +1761,21 @@ test('browser demo launch target emits a standalone page and launch artifact', a
   assert.equal(artifact.checks.boundaryCheck.status, 'passed');
   assert.equal(artifact.checks.pageImportsStudio, false);
   assert.equal(artifact.checks.acceptsArbitraryCommandHatch, false);
-  assert.deepEqual(artifact.controlSurface.acceptedInputSources, ['keyboard', 'pointer', 'wheel']);
+  assert.deepEqual(artifact.controlSurface.acceptedInputSources, ['keyboard', 'pointer', 'mousemove', 'wheel']);
   assert.deepEqual(artifact.controlSurface.missingOperations, []);
   assert.ok(artifact.controlSurface.typedMappings.some((mapping) => mapping.operation === 'selectVoxel'));
   assert.ok(artifact.controlSurface.typedMappings.some((mapping) => mapping.operation === 'applyFirstPersonCameraInput'));
   assert.equal(artifact.gameplayLoop.loopDriver, 'requestAnimationFrame');
   assert.equal(artifact.gameplayLoop.consumesTypedRequestSequences, true);
   assert.equal(artifact.gameplayLoop.mutationBoundary, 'browser-local-readback-only');
+  assert.equal(artifact.firstPersonController.scene.seed, 'asha-demo-m4-walkable-blockers-v0');
+  assert.equal(artifact.firstPersonController.scene.blockers[0].id, 'blocker.forward-lane');
+  assert.equal(artifact.firstPersonController.initialPlayer.collider.radius, 0.35);
   assert.ok(artifact.validations.includes('browser_page_written'));
   assert.ok(artifact.validations.includes('runtime_launched_through_public_runtime_bridge'));
   assert.ok(artifact.validations.includes('browser_controls_registered'));
+  assert.ok(artifact.validations.includes('first_person_walkable_plane_registered'));
+  assert.ok(artifact.validations.includes('cube_collision_readback_registered'));
   assert.ok(artifact.validations.includes('typed_control_mapping_declared'));
   assert.ok(artifact.validations.includes('browser_gameplay_loop_registered'));
   assert.ok(artifact.validations.includes('typed_requests_drive_browser_local_readback'));
@@ -1779,10 +1784,15 @@ test('browser demo launch target emits a standalone page and launch artifact', a
   assert.match(page, /data-asha-browser-demo-ready="true"/);
   assert.match(page, /data-browser-controls-ready="true"/);
   assert.match(page, /data-browser-gameplay-loop-ready="true"/);
+  assert.match(page, /data-first-person-controller-ready="true"/);
+  assert.match(page, /asha-demo-controller-readout/);
   assert.match(page, /browser-demo-launch-ready/);
   assert.match(page, /window\.ashaDemoBrowserLaunch/);
   assert.match(page, /addEventListener\('keydown'/);
   assert.match(page, /addEventListener\('pointerdown'/);
+  assert.match(page, /pointerlockchange/);
+  assert.match(page, /mousemove/);
+  assert.match(page, /player_blocked_by_cube/);
   assert.match(page, /requestAnimationFrame\(renderGameplayFrame\)/);
   assert.match(page, /gameplayReadbacks/);
   assert.match(page, /operation: 'selectVoxel'/);
@@ -1866,6 +1876,18 @@ test('browser interactive aggregate proof records launch input and replay eviden
   assert.match(artifact.browserProof.replayHash, /^sha256:/);
   assert.ok(artifact.validations.includes('interactive_browser_readback_ready'));
   assert.ok(artifact.nonClaims.includes('not_runtime_authority'));
+});
+
+test('browser first-person controller proof script is registered', () => {
+  assert.equal(
+    packageJson.scripts['browser:first-person-controller-proof'],
+    'node scripts/run-first-person-controller-proof.mjs',
+  );
+  const source = fs.readFileSync(new URL('../scripts/run-first-person-controller-proof.mjs', import.meta.url), 'utf8');
+  assert.match(source, /asha_demo_first_person_controller_proof/);
+  assert.match(source, /pointer_lock_requested_by_viewport_click/);
+  assert.match(source, /cube_collision_prevents_penetration/);
+  assert.match(source, /not_runtime_authoritative_collision/);
 });
 
 test('authored round-trip fixture loads into browser runtime readback', async () => {

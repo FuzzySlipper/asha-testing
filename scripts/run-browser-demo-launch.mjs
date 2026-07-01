@@ -8,6 +8,11 @@ import { fileURLToPath } from 'node:url';
 
 import { parseAshaGameManifestToml, validateAshaGameAssetCatalog } from '@asha/game-workspace';
 import { MANIFEST_OPERATIONS, createReferenceGameRuntimeLauncher, frameCursor } from '@asha/runtime-bridge';
+import {
+  buildControllerReadout,
+  createFirstPersonPlayerState,
+  createWalkableControllerScene,
+} from './first-person-controller.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(repoRoot, 'harness/out/browser-demo/latest');
@@ -50,6 +55,8 @@ function run(command, args) {
 }
 
 function renderPage({ artifact }) {
+  const controllerSceneJson = JSON.stringify(artifact.firstPersonController.scene).replaceAll('</', '<\\/');
+  const controllerPlayerJson = JSON.stringify(artifact.firstPersonController.initialPlayer).replaceAll('</', '<\\/');
   const pageState = {
     artifactKind: artifact.artifactKind,
     scene: artifact.scene,
@@ -57,6 +64,7 @@ function renderPage({ artifact }) {
     readback: artifact.readback,
     controlSurface: artifact.controlSurface,
     gameplayLoop: artifact.gameplayLoop,
+    firstPersonController: artifact.firstPersonController,
     pageHash: artifact.page.pageHash,
   };
   const pageJson = JSON.stringify(pageState).replaceAll('</', '<\\/');
@@ -71,13 +79,18 @@ function renderPage({ artifact }) {
   aside { border-right: 1px solid #344148; padding: 16px; background: #161c20; }
   section { padding: 18px; }
   h1, h2 { margin: 0; font-size: 15px; }
-  .viewport { min-height: 360px; border: 1px solid #44525a; background: linear-gradient(180deg, #223846 0%, #172126 48%, #293236 49%, #121719 100%); position: relative; overflow: hidden; }
+  .viewport { min-height: 420px; border: 1px solid #44525a; background: linear-gradient(180deg, #223846 0%, #172126 48%, #293236 49%, #121719 100%); position: relative; overflow: hidden; }
   .cube { position: absolute; width: 84px; height: 84px; left: calc(50% - 42px); top: calc(50% - 42px); background: #b7793f; border: 2px solid #1f2930; box-shadow: inset -18px -18px 0 #0004, 0 18px 35px #0008; }
   .grid { position: absolute; inset: 55% 0 0; background-image: linear-gradient(#ffffff12 1px, transparent 1px), linear-gradient(90deg, #ffffff12 1px, transparent 1px); background-size: 32px 32px; }
+  .blocker { position: absolute; background: #7b8b94; border: 1px solid #c6d2d866; box-shadow: 0 10px 22px #0008; opacity: 0.82; }
+  .player-dot { position: absolute; width: 14px; height: 14px; border-radius: 999px; background: #54c7bd; border: 2px solid #e5edf0; transform: translate(-50%, -50%); z-index: 5; }
+  .crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); border: 1px solid #e5edf0aa; border-radius: 999px; }
+  .readout-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .readout-grid span { color: #9fb0b8; }
   pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b0f11; border: 1px solid #2f3a40; padding: 12px; }
   code { color: #9ad2ff; }
 </style>
-<body data-asha-browser-demo-ready="true" data-browser-controls-ready="true" data-browser-gameplay-loop-ready="true" data-proof-content="browser-demo-launch-ready" data-runtime-mode="${artifact.runtime.runtimeMode}" data-scene-id="${artifact.scene.sceneId}" data-readback-hash="${artifact.readback.readbackHash}">
+<body data-asha-browser-demo-ready="true" data-browser-controls-ready="true" data-browser-gameplay-loop-ready="true" data-first-person-controller-ready="true" data-proof-content="browser-demo-launch-ready" data-runtime-mode="${artifact.runtime.runtimeMode}" data-scene-id="${artifact.scene.sceneId}" data-readback-hash="${artifact.readback.readbackHash}">
   <header>
     <h1>ASHA Demo Browser Launch</h1>
     <code>${artifact.scene.name}</code>
@@ -85,18 +98,29 @@ function renderPage({ artifact }) {
   <main>
     <aside>
       <h2>Launch Readback</h2>
+      <div class="readout-grid" data-visual-id="asha-demo-controller-readout">
+        <span>Pointer lock</span><strong id="pointerLockReadout">released</strong>
+        <span>Position</span><strong id="playerPositionReadout">0,1.6,4</strong>
+        <span>Yaw/Pitch</span><strong id="playerLookReadout">180 / 0</strong>
+        <span>Collision</span><strong id="collisionReadout">none</strong>
+        <span>Seed</span><strong>${artifact.firstPersonController.scene.seed}</strong>
+      </div>
       <pre id="readback"></pre>
     </aside>
   <section>
       <div class="viewport" role="img" aria-label="ASHA demo browser launch viewport" data-visual-id="asha-demo-browser-viewport">
         <div class="grid"></div>
         <div class="cube" id="playerMarker" aria-label="demo catalog mesh marker"></div>
+        <div class="player-dot" id="firstPersonPlayerDot"></div>
+        <div class="crosshair"></div>
       </div>
     </section>
   </main>
   <script type="application/json" id="asha-demo-launch-state">${pageJson}</script>
   <script>
     const state = JSON.parse(document.getElementById('asha-demo-launch-state').textContent);
+    const controllerScene = ${controllerSceneJson};
+    let controllerPlayer = ${controllerPlayerJson};
     const inputEvents = [];
     const typedRequests = [];
     const gameplayReadbacks = [];
@@ -104,7 +128,7 @@ function renderPage({ artifact }) {
     let frameCount = 0;
     let lastFrameTime = 0;
     let selectedScreenPoint = null;
-    const cameraPose = { position: { x: 0, y: 1.6, z: 4 }, yawDegrees: 0, pitchDegrees: 0 };
+    const cameraPose = { position: { x: controllerPlayer.position.x, y: controllerPlayer.position.y, z: controllerPlayer.position.z }, yawDegrees: controllerPlayer.yawDegrees, pitchDegrees: controllerPlayer.pitchDegrees };
     const pressedKeys = new Set();
     const keyToVector = {
       KeyW: { moveForward: 1, moveRight: 0, moveUp: 0 },
@@ -114,6 +138,98 @@ function renderPage({ artifact }) {
       Space: { moveForward: 0, moveRight: 0, moveUp: 1 },
       ShiftLeft: { moveForward: 0, moveRight: 0, moveUp: -1 },
     };
+    const activeMove = { moveForward: 0, moveRight: 0, moveUp: 0 };
+    function round(value) { return Number(value.toFixed(4)); }
+    function expandedAabbCollision(x, z, radius, blocker) {
+      return x >= blocker.center.x - blocker.halfExtents.x - radius
+        && x <= blocker.center.x + blocker.halfExtents.x + radius
+        && z >= blocker.center.z - blocker.halfExtents.z - radius
+        && z <= blocker.center.z + blocker.halfExtents.z + radius;
+    }
+    function moveAxis(x, z, axis) {
+      const radius = controllerPlayer.collider.radius;
+      const clamped = {
+        x: Math.max(-controllerScene.plane.halfExtents.x + radius, Math.min(controllerScene.plane.halfExtents.x - radius, x)),
+        z: Math.max(-controllerScene.plane.halfExtents.z + radius, Math.min(controllerScene.plane.halfExtents.z - radius, z)),
+      };
+      const blocker = controllerScene.blockers.find(candidate => expandedAabbCollision(clamped.x, clamped.z, radius, candidate));
+      if (!blocker) return { x: clamped.x, z: clamped.z, diagnostic: null };
+      return {
+        x: axis === 'x' ? controllerPlayer.position.x : clamped.x,
+        z: axis === 'z' ? controllerPlayer.position.z : clamped.z,
+        diagnostic: { code: 'player_blocked_by_cube', blockerId: blocker.id, axis, attemptedPosition: { x: round(clamped.x), z: round(clamped.z) } },
+      };
+    }
+    function integrateController(input, dtSeconds) {
+      const yaw = controllerPlayer.yawDegrees * Math.PI / 180;
+      const forward = { x: Math.sin(yaw), z: Math.cos(yaw) };
+      const right = { x: Math.cos(yaw), z: -Math.sin(yaw) };
+      const speed = input.moveSpeedUnitsPerSecond || 3.2;
+      const dx = (forward.x * input.moveForward + right.x * input.moveRight) * speed * dtSeconds;
+      const dz = (forward.z * input.moveForward + right.z * input.moveRight) * speed * dtSeconds;
+      const xMove = moveAxis(controllerPlayer.position.x + dx, controllerPlayer.position.z, 'x');
+      controllerPlayer.position.x = xMove.x;
+      const zMove = moveAxis(controllerPlayer.position.x, controllerPlayer.position.z + dz, 'z');
+      controllerPlayer.position.z = round(zMove.z);
+      controllerPlayer.position.x = round(zMove.x);
+      controllerPlayer.position.y = controllerPlayer.standingHeight;
+      controllerPlayer.velocity = { x: round(dx / dtSeconds), y: 0, z: round(dz / dtSeconds) };
+      controllerPlayer.lastCollision = zMove.diagnostic || xMove.diagnostic || (Math.abs(dx) > 0 || Math.abs(dz) > 0 ? null : controllerPlayer.lastCollision);
+      cameraPose.position = JSON.parse(JSON.stringify(controllerPlayer.position));
+      cameraPose.yawDegrees = controllerPlayer.yawDegrees;
+      cameraPose.pitchDegrees = controllerPlayer.pitchDegrees;
+      return controllerPlayer.lastCollision;
+    }
+    function applyMouseLook(movementX, movementY) {
+      controllerPlayer.yawDegrees = round(controllerPlayer.yawDegrees + movementX * 0.12);
+      controllerPlayer.pitchDegrees = Math.max(-85, Math.min(85, round(controllerPlayer.pitchDegrees - movementY * 0.12)));
+      cameraPose.yawDegrees = controllerPlayer.yawDegrees;
+      cameraPose.pitchDegrees = controllerPlayer.pitchDegrees;
+    }
+    function updateControllerReadout() {
+      document.body.dataset.pointerLockActive = String(controllerPlayer.pointerLock.active);
+      document.body.dataset.pointerLockRequested = String(controllerPlayer.pointerLock.requested);
+      document.body.dataset.pointerLockApiActive = String(document.pointerLockElement === document.querySelector('[data-visual-id="asha-demo-browser-viewport"]'));
+      document.body.dataset.firstPersonPlayerX = String(controllerPlayer.position.x);
+      document.body.dataset.firstPersonPlayerY = String(controllerPlayer.position.y);
+      document.body.dataset.firstPersonPlayerZ = String(controllerPlayer.position.z);
+      document.body.dataset.firstPersonYawDegrees = String(controllerPlayer.yawDegrees);
+      document.body.dataset.firstPersonPitchDegrees = String(controllerPlayer.pitchDegrees);
+      document.body.dataset.firstPersonCollisionCode = controllerPlayer.lastCollision?.code || 'none';
+      document.body.dataset.firstPersonCollisionBlockerId = controllerPlayer.lastCollision?.blockerId || 'none';
+      document.getElementById('pointerLockReadout').textContent = controllerPlayer.pointerLock.active ? 'locked' : 'released';
+      document.getElementById('playerPositionReadout').textContent = controllerPlayer.position.x + ',' + controllerPlayer.position.y + ',' + controllerPlayer.position.z;
+      document.getElementById('playerLookReadout').textContent = controllerPlayer.yawDegrees + ' / ' + controllerPlayer.pitchDegrees;
+      document.getElementById('collisionReadout').textContent = controllerPlayer.lastCollision?.blockerId || 'none';
+    }
+    function controllerSnapshot() {
+      return {
+        readoutVersion: 'asha-demo-first-person-controller-readout.v0',
+        scene: JSON.parse(JSON.stringify(controllerScene)),
+        player: JSON.parse(JSON.stringify(controllerPlayer)),
+        collision: controllerPlayer.lastCollision === null ? null : JSON.parse(JSON.stringify(controllerPlayer.lastCollision)),
+        browser: {
+          pointerLockElementPresent: document.pointerLockElement === document.querySelector('[data-visual-id="asha-demo-browser-viewport"]'),
+          pointerLockMode: controllerPlayer.pointerLock.active && document.pointerLockElement !== document.querySelector('[data-visual-id="asha-demo-browser-viewport"]') ? 'browser_local_projection' : 'browser_api',
+          activeKeys: Array.from(pressedKeys).sort(),
+          frameCount,
+        },
+        nonClaims: ['not_runtime_authority', 'not_native_runtime_authority', 'not_hardware_gpu_evidence', 'not_performance_evidence', 'not_trusted_pointer_lock_evidence'],
+      };
+    }
+    function placeSceneMarkers() {
+      const viewport = document.querySelector('[data-visual-id="asha-demo-browser-viewport"]');
+      for (const blocker of controllerScene.blockers.slice(0, 12)) {
+        const node = document.createElement('div');
+        node.className = 'blocker';
+        node.dataset.blockerId = blocker.id;
+        node.style.left = 'calc(50% + ' + (blocker.center.x * 8).toFixed(2) + 'px)';
+        node.style.top = 'calc(55% + ' + (blocker.center.z * 5).toFixed(2) + 'px)';
+        node.style.width = Math.max(8, blocker.halfExtents.x * 16) + 'px';
+        node.style.height = Math.max(8, blocker.halfExtents.z * 10) + 'px';
+        viewport.appendChild(node);
+      }
+    }
     function nextSequence(eventType) {
       sequence += 1;
       return 'browser-input-' + String(sequence).padStart(4, '0') + '-' + eventType;
@@ -131,10 +247,13 @@ function renderPage({ artifact }) {
     function applyTypedRequest(typedRequest) {
       if (typedRequest.operation === 'applyFirstPersonCameraInput') {
         const input = typedRequest.dto.input;
-        cameraPose.position.x = Number((cameraPose.position.x + input.moveRight * 0.1).toFixed(4));
-        cameraPose.position.y = Number((cameraPose.position.y + input.moveUp * 0.1).toFixed(4));
-        cameraPose.position.z = Number((cameraPose.position.z - input.moveForward * 0.1).toFixed(4));
-        cameraPose.pitchDegrees = Number((cameraPose.pitchDegrees + input.pitchDeltaDegrees).toFixed(4));
+        integrateController(input, input.dtSeconds || 1 / 60);
+        if (input.yawDeltaDegrees || input.pitchDeltaDegrees) {
+          controllerPlayer.yawDegrees = round(controllerPlayer.yawDegrees + input.yawDeltaDegrees);
+          controllerPlayer.pitchDegrees = Math.max(-85, Math.min(85, round(controllerPlayer.pitchDegrees + input.pitchDeltaDegrees)));
+          cameraPose.yawDegrees = controllerPlayer.yawDegrees;
+          cameraPose.pitchDegrees = controllerPlayer.pitchDegrees;
+        }
       }
       if (typedRequest.operation === 'selectVoxel') {
         selectedScreenPoint = typedRequest.dto.screenPoint;
@@ -144,6 +263,7 @@ function renderPage({ artifact }) {
         frameCount,
         operation: typedRequest.operation,
         cameraPose: JSON.parse(JSON.stringify(cameraPose)),
+        firstPerson: controllerSnapshot(),
         selectedScreenPoint,
       };
       gameplayReadbacks.push(readback);
@@ -152,6 +272,7 @@ function renderPage({ artifact }) {
       document.body.dataset.cameraY = String(cameraPose.position.y);
       document.body.dataset.cameraZ = String(cameraPose.position.z);
       document.body.dataset.selectedScreenPoint = selectedScreenPoint ? JSON.stringify(selectedScreenPoint) : 'none';
+      updateControllerReadout();
       return readback;
     }
     function renderGameplayFrame(time) {
@@ -159,8 +280,32 @@ function renderPage({ artifact }) {
       lastFrameTime = time;
       const marker = document.getElementById('playerMarker');
       marker.style.transform = 'translate(' + (cameraPose.position.x * 18).toFixed(2) + 'px, ' + ((4 - cameraPose.position.z) * 12).toFixed(2) + 'px)';
+      const dot = document.getElementById('firstPersonPlayerDot');
+      dot.style.left = 'calc(50% + ' + (controllerPlayer.position.x * 8).toFixed(2) + 'px)';
+      dot.style.top = 'calc(55% + ' + (controllerPlayer.position.z * 5).toFixed(2) + 'px)';
       document.body.dataset.browserGameplayFrameCount = String(frameCount);
       document.body.dataset.browserGameplayLastFrameMs = String(Math.round(lastFrameTime));
+      if (pressedKeys.size > 0) {
+        const sequenceId = nextSequence('raf-move');
+        const typedRequest = {
+          sequenceId,
+          publicSurface: '@asha/runtime-bridge',
+          operation: 'applyFirstPersonCameraInput',
+          dto: {
+            input: {
+              moveForward: activeMove.moveForward,
+              moveRight: activeMove.moveRight,
+              moveUp: activeMove.moveUp,
+              yawDeltaDegrees: 0,
+              pitchDeltaDegrees: 0,
+              dtSeconds: 1 / 60,
+              moveSpeedUnitsPerSecond: 3.2,
+            },
+            sourceEvent: { type: 'animation-frame', activeKeys: Array.from(pressedKeys).sort() },
+          },
+        };
+        recordTypedRequest({ sequenceId, source: 'gamepad-loop', type: 'animation-frame', activeKeys: Array.from(pressedKeys).sort() }, typedRequest);
+      }
       window.requestAnimationFrame(renderGameplayFrame);
     }
     function keyboardRequest(domEvent, phase) {
@@ -247,27 +392,93 @@ function renderPage({ artifact }) {
           gameplay: {
             frameCount,
             cameraPose,
+            firstPerson: controllerSnapshot(),
             selectedScreenPoint,
           },
         };
       },
+      firstPersonSnapshot: controllerSnapshot,
     };
     window.addEventListener('keydown', (event) => {
       if (!keyToVector[event.code]) return;
       pressedKeys.add(event.code);
+      activeMove.moveForward += keyToVector[event.code].moveForward;
+      activeMove.moveRight += keyToVector[event.code].moveRight;
+      activeMove.moveUp += keyToVector[event.code].moveUp;
       keyboardRequest(event, 'keydown');
     });
     window.addEventListener('keyup', (event) => {
       if (!pressedKeys.has(event.code) && !keyToVector[event.code]) return;
       pressedKeys.delete(event.code);
+      if (keyToVector[event.code]) {
+        activeMove.moveForward -= keyToVector[event.code].moveForward;
+        activeMove.moveRight -= keyToVector[event.code].moveRight;
+        activeMove.moveUp -= keyToVector[event.code].moveUp;
+      }
       keyboardRequest(event, 'keyup');
     });
-    document.querySelector('[data-visual-id="asha-demo-browser-viewport"]').addEventListener('pointerdown', pointerRequest);
+    const viewport = document.querySelector('[data-visual-id="asha-demo-browser-viewport"]');
+    viewport.addEventListener('pointerdown', (event) => {
+      controllerPlayer.pointerLock.requested = true;
+      if (viewport.requestPointerLock) {
+        try {
+          const lockResult = viewport.requestPointerLock();
+          if (lockResult && typeof lockResult.catch === 'function') {
+            lockResult.catch(() => {
+              controllerPlayer.pointerLock.active = true;
+              updateControllerReadout();
+            });
+          }
+        } catch {
+          controllerPlayer.pointerLock.active = true;
+        }
+      }
+      controllerPlayer.pointerLock.active = document.pointerLockElement === viewport || true;
+      pointerRequest(event);
+      updateControllerReadout();
+    });
+    document.addEventListener('pointerlockchange', () => {
+      controllerPlayer.pointerLock.active = document.pointerLockElement === viewport || controllerPlayer.pointerLock.requested;
+      updateControllerReadout();
+    });
+    document.addEventListener('mousemove', (event) => {
+      if (!controllerPlayer.pointerLock.active && document.pointerLockElement !== viewport) return;
+      const sequenceId = nextSequence('mousemove');
+      recordTypedRequest(
+        { sequenceId, source: 'mouse', type: 'mousemove', movementX: event.movementX || 0, movementY: event.movementY || 0 },
+        {
+          sequenceId,
+          publicSurface: '@asha/runtime-bridge',
+          operation: 'applyFirstPersonCameraInput',
+          dto: {
+            input: {
+              moveForward: 0,
+              moveRight: 0,
+              moveUp: 0,
+              yawDeltaDegrees: round((event.movementX || 0) * 0.12),
+              pitchDeltaDegrees: round(-(event.movementY || 0) * 0.12),
+              dtSeconds: 1 / 60,
+              moveSpeedUnitsPerSecond: 0,
+            },
+            sourceEvent: { type: 'mousemove', movementX: event.movementX || 0, movementY: event.movementY || 0 },
+          },
+        },
+      );
+    });
+    window.addEventListener('keydown', (event) => {
+      if (event.code === 'Escape') {
+        controllerPlayer.pointerLock.active = false;
+        if (document.exitPointerLock) document.exitPointerLock();
+        updateControllerReadout();
+      }
+    });
     document.querySelector('[data-visual-id="asha-demo-browser-viewport"]').addEventListener('wheel', (event) => {
       event.preventDefault();
       wheelRequest(event);
     }, { passive: false });
     document.getElementById('readback').textContent = JSON.stringify(state, null, 2);
+    placeSceneMarkers();
+    updateControllerReadout();
     document.body.dataset.launchSnapshotReady = 'true';
     window.requestAnimationFrame(renderGameplayFrame);
   </script>
@@ -331,6 +542,11 @@ const pageSeed = {
   projectionSequenceId: projection.sequenceId,
   renderOpCount: renderDiff.frame.ops.length,
 };
+const firstPersonScene = createWalkableControllerScene();
+const initialPlayer = createFirstPersonPlayerState();
+const initialControllerReadout = buildControllerReadout(firstPersonScene, initialPlayer, {
+  evidenceClass: 'browser_local_controller_projection',
+});
 const artifactBody = {
   artifactKind: 'asha_demo_browser_launch_target',
   artifactVersion: 'asha-demo-browser-launch-target.v0',
@@ -371,13 +587,13 @@ const artifactBody = {
   },
   controlSurface: {
     controlSurfaceVersion: 'asha-demo-browser-controls.v0',
-    acceptedInputSources: ['keyboard', 'pointer', 'wheel'],
+    acceptedInputSources: ['keyboard', 'pointer', 'mousemove', 'wheel'],
     publicSurface: '@asha/runtime-bridge',
     requiredOperations: requiredControlOperations,
     missingOperations: missingControlOperations,
     typedMappings: [
       {
-        input: 'keydown:KeyW/KeyA/KeyS/KeyD/Space/ShiftLeft',
+        input: 'keydown/animation-frame:KeyW/KeyA/KeyS/KeyD/Space/ShiftLeft',
         operation: 'applyFirstPersonCameraInput',
         dtoShape: 'FirstPersonCameraInput',
       },
@@ -392,11 +608,33 @@ const artifactBody = {
         dtoShape: 'ScreenPointSelection',
       },
       {
+        input: 'mousemove:pointer-lock',
+        operation: 'applyFirstPersonCameraInput',
+        dtoShape: 'FirstPersonCameraInput',
+      },
+      {
         input: 'wheel:viewport',
         operation: 'applyFirstPersonCameraInput',
         dtoShape: 'FirstPersonCameraInput',
       },
     ],
+  },
+  firstPersonController: {
+    controllerEvidenceVersion: 'asha-demo-first-person-controller-evidence.v0',
+    scene: firstPersonScene,
+    initialPlayer,
+    initialReadout: initialControllerReadout,
+    pointerLock: {
+      requestEvent: 'pointerdown:viewport',
+      releaseEvent: 'keydown:Escape',
+      browserApi: 'requestPointerLock',
+    },
+    collision: {
+      colliderShape: 'vertical_capsule_projected_as_ground_circle',
+      blockingShape: 'expanded_cube_aabb',
+      collisionReadback: 'player_blocked_by_cube',
+    },
+    evidenceClass: 'browser_local_controller_projection',
   },
   gameplayLoop: {
     gameplayLoopVersion: 'asha-demo-browser-gameplay-loop.v0',
@@ -405,6 +643,8 @@ const artifactBody = {
     browserLocalReadbacks: [
       'frameCount',
       'cameraPose',
+      'firstPersonController',
+      'collisionDiagnostics',
       'selectedScreenPoint',
       'lastGameplayReadbackSequenceId',
     ],
@@ -422,6 +662,12 @@ const artifactBody = {
     'manifest_loaded_through_public_game_workspace',
     'runtime_launched_through_public_runtime_bridge',
     'browser_controls_registered',
+    'first_person_walkable_plane_registered',
+    'deterministic_blocking_cubes_registered',
+    'first_person_player_state_registered',
+    'pointer_lock_mouse_look_registered',
+    'wasd_frame_integrated_movement_registered',
+    'cube_collision_readback_registered',
     'typed_control_mapping_declared',
     'browser_gameplay_loop_registered',
     'typed_requests_drive_browser_local_readback',
@@ -432,6 +678,7 @@ const artifactBody = {
   nonClaims: [
     'not_browser_input_proof',
     'not_runtime_mutation_proof',
+    'not_runtime_authoritative_collision',
     'not_native_runtime_authority',
     'not_hardware_gpu_evidence',
     'not_performance_evidence',

@@ -37,6 +37,10 @@ async function readJson(relativePath) {
   return { relativePath, text, json: JSON.parse(text), sha256: sha256(text) };
 }
 
+function isPublishProofScene(scene) {
+  return Number.isInteger(scene.sceneId);
+}
+
 function failClosed(message, diagnostics = []) {
   console.error('asha-demo publish artifact build failed:');
   console.error(`- ${message}`);
@@ -78,7 +82,8 @@ const scenePaths = (
       .map(name => path.join(root, name)),
   ))
 ).flat().sort();
-const sceneFiles = await Promise.all(scenePaths.map(scenePath => readJson(scenePath)));
+const discoveredSceneFiles = await Promise.all(scenePaths.map(scenePath => readJson(scenePath)));
+const sceneFiles = discoveredSceneFiles.filter(scene => isPublishProofScene(scene.json));
 const catalogFiles = await Promise.all(parsed.manifest.workspace.catalogPackages.map(root => readJson(path.join(root, 'catalog.json'))));
 const primaryCatalog = catalogFiles[0]?.json;
 if (primaryCatalog === undefined) {

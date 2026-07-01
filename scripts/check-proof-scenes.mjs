@@ -24,6 +24,10 @@ function sceneFilesForRoot(root) {
     .map((name) => `${root}/${name}`);
 }
 
+function isProofScene(scene) {
+  return Number.isInteger(scene.sceneId);
+}
+
 const manifestResult = parseAshaGameManifestToml(readFileSync(join(repoRoot, 'asha.game.toml'), 'utf8'));
 if (!manifestResult.ok) {
   for (const diagnostic of manifestResult.diagnostics) fail(`${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`);
@@ -38,7 +42,10 @@ if (!manifestResult.ok) {
     for (const diagnostic of catalogValidation.diagnostics) fail(`${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`);
   } else {
     const catalogIds = new Set(catalogValidation.catalog.entries.map((entry) => entry.id));
-    const scenes = manifestResult.manifest.workspace.sceneRoots.flatMap(sceneFilesForRoot).map((path) => ({ path, scene: readJson(path) }));
+    const scenes = manifestResult.manifest.workspace.sceneRoots
+      .flatMap(sceneFilesForRoot)
+      .map((path) => ({ path, scene: readJson(path) }))
+      .filter(({ scene }) => isProofScene(scene));
     if (scenes.length === 0) fail('no proof scenes found');
     for (const { path, scene } of scenes) {
       if (scene.schemaVersion !== 1) fail(`${path} has unsupported schemaVersion`);
