@@ -16,7 +16,7 @@ function sha256(value) {
 }
 
 function fail(message) {
-  console.error(`asha-demo publish evidence check failed: ${message}`);
+  console.error(`asha-testing publish evidence check failed: ${message}`);
   process.exit(1);
 }
 
@@ -80,4 +80,4 @@ for (const nonClaim of ['not_store_submission', 'not_installer', 'not_package_si
   assert.ok(evidence.nonClaims.includes(nonClaim), `missing publish evidence non-claim ${nonClaim}`);
 }
 
-console.log('asha-demo publish evidence check: OK');
+console.log('asha-testing publish evidence check: OK');

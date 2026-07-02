@@ -32,7 +32,7 @@ function fileSize(relativePath) {
 const manifestText = readFileSync(join(repoRoot, 'asha.game.toml'), 'utf8');
 const manifestResult = parseAshaGameManifestToml(manifestText);
 if (!manifestResult.ok) {
-  console.error('asha-demo asset inventory failed: manifest did not parse');
+  console.error('asha-testing asset inventory failed: manifest did not parse');
   for (const diagnostic of manifestResult.diagnostics) console.error(`- ${diagnostic.code} at ${diagnostic.path}: ${diagnostic.message}`);
   process.exit(1);
 }

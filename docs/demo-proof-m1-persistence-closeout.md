@@ -9,7 +9,7 @@ are pending in this working tree; current base commits at closeout time were:
 
 - `asha-studio`: `f070c27`
 - `asha`: `21ce38c7`
-- `asha-demo`: `db44eff`
+- `asha-testing`: `db44eff`
 
 ## Commands
 
@@ -30,7 +30,7 @@ Run from `/home/dev/asha/ts/packages/game-workspace`:
 npm test
 ```
 
-Run from `/home/dev/asha-demo`:
+Run from `/home/dev/asha-testing`:
 
 ```bash
 node --test --test-concurrency=1 --test-name-pattern "authoring save contract|authoring public API lanes|M1.1 bounded workspace persistence" tests/scaffold.test.mjs

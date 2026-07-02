@@ -17,7 +17,7 @@ export function encodeWebSocketText(text) {
     header.writeUInt16BE(payload.length, 2);
     return Buffer.concat([header, payload]);
   }
-  throw new Error('asha-demo devtools frames support JSON messages up to 65535 bytes');
+  throw new Error('asha-testing devtools frames support JSON messages up to 65535 bytes');
 }
 
 export function decodeWebSocketText(buffer) {
@@ -66,7 +66,7 @@ function encodeClientText(text) {
     header.writeUInt16BE(payload.length, 2);
     return Buffer.concat([header, mask, masked]);
   }
-  throw new Error('asha-demo devtools client frames support JSON messages up to 65535 bytes');
+  throw new Error('asha-testing devtools client frames support JSON messages up to 65535 bytes');
 }
 
 export async function createJsonWebSocketServer({ host, port, handleMessage }) {

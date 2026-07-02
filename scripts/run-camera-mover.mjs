@@ -223,10 +223,10 @@ const artifact = {
     task: 2540,
     followUpTask: 2566,
     description:
-      'Runs a first-person camera mover scenario from asha-demo using only public ASHA contracts/runtime bridge surfaces and records deterministic movement/projection evidence.',
+      'Runs a first-person camera mover scenario from asha-testing using only public ASHA contracts/runtime bridge surfaces and records deterministic movement/projection evidence.',
   },
   repo: {
-    name: 'asha-demo',
+    name: 'asha-testing',
     path: repoRoot,
   },
   ashaSource,

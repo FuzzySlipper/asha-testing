@@ -33,7 +33,7 @@ function withoutIndexHash(index) {
 }
 
 function fail(message) {
-  console.error(`asha-demo V2 proof index check failed: ${message}`);
+  console.error(`asha-testing V2 proof index check failed: ${message}`);
   process.exit(1);
 }
 
@@ -79,4 +79,4 @@ assert.equal(index.runtime.mode, 'native');
 assert.equal(publishBackendSmoke.noDevServerRequired, true);
 assert.ok(index.validations.includes('den_summary_is_data_only'));
 
-console.log('asha-demo V2 proof index check: OK');
+console.log('asha-testing V2 proof index check: OK');

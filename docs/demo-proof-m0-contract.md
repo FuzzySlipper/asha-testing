@@ -59,7 +59,7 @@ All later milestone implementation must preserve these M0 gates:
 
 ## Verification handles
 
-M0 contract docs are covered by the `asha-demo` scaffold tests:
+M0 contract docs are covered by the `asha-testing` scaffold tests:
 
 ```bash
 node --test --test-concurrency=1 --test-name-pattern "M0 demo proof inventory|authoring save contract|authoring public API lanes|browser interactive proof contract|Studio live debug inspector contract|round-trip evidence contract|M0 contract" tests/scaffold.test.mjs

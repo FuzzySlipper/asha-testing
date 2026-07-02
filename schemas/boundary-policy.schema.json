@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "asha-demo boundary policy",
+  "title": "asha-testing boundary policy",
   "type": "object",
   "additionalProperties": false,
   "required": ["typescript", "rust", "pathRules", "remediation"],

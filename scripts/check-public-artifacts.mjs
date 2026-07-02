@@ -50,9 +50,9 @@ if (!existsSync(artifactManifestPath)) {
 }
 
 if (failures.length > 0) {
-  console.error('asha-demo public artifact check failed:');
+  console.error('asha-testing public artifact check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log('asha-demo public artifact check: OK');
+console.log('asha-testing public artifact check: OK');

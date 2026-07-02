@@ -224,9 +224,9 @@ for (const cargoFile of walk(repoRoot, (full) => path.basename(full) === 'Cargo.
 }
 
 if (failures.length > 0) {
-  console.error('asha-demo boundary check failed:');
+  console.error('asha-testing boundary check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log('asha-demo boundary check: OK');
+console.log('asha-testing boundary check: OK');

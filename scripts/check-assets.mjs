@@ -55,9 +55,9 @@ if (!manifestResult.ok) {
 }
 
 if (failures.length > 0) {
-  console.error('asha-demo asset catalog check failed:');
+  console.error('asha-testing asset catalog check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log('asha-demo asset catalog check: OK');
+console.log('asha-testing asset catalog check: OK');

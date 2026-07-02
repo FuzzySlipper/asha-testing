@@ -79,16 +79,30 @@ function renderPage({ artifact }) {
   aside { border-right: 1px solid #344148; padding: 16px; background: #161c20; }
   section { padding: 18px; }
   h1, h2 { margin: 0; font-size: 15px; }
-  .viewport { min-height: 420px; border: 1px solid #44525a; background: linear-gradient(180deg, #223846 0%, #172126 48%, #293236 49%, #121719 100%); position: relative; overflow: hidden; }
+  .viewport { --horizon-y: 48%; --grid-shift-x: 0px; --grid-shift-y: 0px; --yaw-degrees: 180deg; min-height: 420px; border: 1px solid #44525a; background: linear-gradient(180deg, #263e51 0%, #172329 var(--horizon-y), #334136 calc(var(--horizon-y) + 1px), #111719 100%); position: relative; overflow: hidden; perspective: 680px; }
   .cube { position: absolute; width: 84px; height: 84px; left: calc(50% - 42px); top: calc(50% - 42px); background: #b7793f; border: 2px solid #1f2930; box-shadow: inset -18px -18px 0 #0004, 0 18px 35px #0008; }
-  .grid { position: absolute; inset: 55% 0 0; background-image: linear-gradient(#ffffff12 1px, transparent 1px), linear-gradient(90deg, #ffffff12 1px, transparent 1px); background-size: 32px 32px; }
-  .blocker { position: absolute; background: #7b8b94; border: 1px solid #c6d2d866; box-shadow: 0 10px 22px #0008; opacity: 0.82; }
+  .grid { position: absolute; inset: var(--horizon-y) -80px -80px; transform-origin: 50% 0; transform: rotateX(68deg) translate3d(var(--grid-shift-x), var(--grid-shift-y), 0); background-image: linear-gradient(#d8e5df1a 1px, transparent 1px), linear-gradient(90deg, #d8e5df1a 1px, transparent 1px); background-size: 38px 38px; opacity: 0.9; }
+  .blocker { position: absolute; left: 50%; top: 50%; width: 48px; height: 96px; transform: translate3d(-50%, -100%, 0); transform-origin: 50% 100%; background: linear-gradient(135deg, #9faeb0 0%, #6d7d82 58%, #47545a 100%); border: 1px solid #d9e6e980; box-shadow: inset -16px -12px 0 #0003, inset 12px 10px 0 #ffffff10, 0 18px 34px #0009; opacity: 0.94; will-change: transform, width, height, opacity; }
+  .blocker::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0 68%, #0000002e 68% 100%); pointer-events: none; }
+  .blocker[data-blocker-id="blocker.forward-lane"] { background: linear-gradient(135deg, #c38a52 0%, #98663d 58%, #5b3f2e 100%); }
   .player-dot { position: absolute; width: 14px; height: 14px; border-radius: 999px; background: #54c7bd; border: 2px solid #e5edf0; transform: translate(-50%, -50%); z-index: 5; }
   .crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); border: 1px solid #e5edf0aa; border-radius: 999px; }
+  .crosshair::before, .crosshair::after { content: ""; position: absolute; background: #e5edf0aa; }
+  .crosshair::before { left: 50%; top: -9px; width: 1px; height: 6px; transform: translateX(-50%); box-shadow: 0 34px 0 #e5edf0aa; }
+  .crosshair::after { left: -9px; top: 50%; width: 6px; height: 1px; transform: translateY(-50%); box-shadow: 34px 0 0 #e5edf0aa; }
   .readout-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .readout-grid span { color: #9fb0b8; }
   pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b0f11; border: 1px solid #2f3a40; padding: 12px; }
   code { color: #9ad2ff; }
+  body[data-human-play-mode="true"] { height: 100vh; overflow: hidden; }
+  body[data-human-play-mode="true"] header { position: fixed; inset: 0 0 auto 0; z-index: 10; background: #101417dd; backdrop-filter: blur(8px); }
+  body[data-human-play-mode="true"] main { grid-template-columns: minmax(0, 1fr); height: 100vh; padding-top: 49px; }
+  body[data-human-play-mode="true"] aside { position: fixed; left: 16px; top: 68px; z-index: 10; width: min(280px, calc(100vw - 32px)); border: 1px solid #344148; border-radius: 6px; background: #161c20dd; backdrop-filter: blur(8px); }
+  body[data-human-play-mode="true"] aside h2 { display: none; }
+  body[data-human-play-mode="true"] aside pre { display: none; }
+  body[data-human-play-mode="true"] section { padding: 0; min-height: 0; }
+  body[data-human-play-mode="true"] .viewport { border: 0; height: calc(100vh - 49px); min-height: 0; }
+  body[data-human-play-mode="true"] .cube, body[data-human-play-mode="true"] .player-dot { display: none; }
 </style>
 <body data-asha-browser-demo-ready="true" data-browser-controls-ready="true" data-browser-gameplay-loop-ready="true" data-first-person-controller-ready="true" data-proof-content="browser-demo-launch-ready" data-runtime-mode="${artifact.runtime.runtimeMode}" data-scene-id="${artifact.scene.sceneId}" data-readback-hash="${artifact.readback.readbackHash}">
   <header>
@@ -118,6 +132,9 @@ function renderPage({ artifact }) {
   </main>
   <script type="application/json" id="asha-demo-launch-state">${pageJson}</script>
   <script>
+    if (new URLSearchParams(window.location.search).get('play') === '1') {
+      document.body.dataset.humanPlayMode = 'true';
+    }
     const state = JSON.parse(document.getElementById('asha-demo-launch-state').textContent);
     const controllerScene = ${controllerSceneJson};
     let controllerPlayer = ${controllerPlayerJson};
@@ -139,6 +156,7 @@ function renderPage({ artifact }) {
       ShiftLeft: { moveForward: 0, moveRight: 0, moveUp: -1 },
     };
     const activeMove = { moveForward: 0, moveRight: 0, moveUp: 0 };
+    const blockerNodes = new Map();
     function round(value) { return Number(value.toFixed(4)); }
     function expandedAabbCollision(x, z, radius, blocker) {
       return x >= blocker.center.x - blocker.halfExtents.x - radius
@@ -219,15 +237,73 @@ function renderPage({ artifact }) {
     }
     function placeSceneMarkers() {
       const viewport = document.querySelector('[data-visual-id="asha-demo-browser-viewport"]');
-      for (const blocker of controllerScene.blockers.slice(0, 12)) {
+      for (const blocker of controllerScene.blockers) {
         const node = document.createElement('div');
         node.className = 'blocker';
         node.dataset.blockerId = blocker.id;
-        node.style.left = 'calc(50% + ' + (blocker.center.x * 8).toFixed(2) + 'px)';
-        node.style.top = 'calc(55% + ' + (blocker.center.z * 5).toFixed(2) + 'px)';
-        node.style.width = Math.max(8, blocker.halfExtents.x * 16) + 'px';
-        node.style.height = Math.max(8, blocker.halfExtents.z * 10) + 'px';
+        node.setAttribute('aria-label', 'walkable scene blocker ' + blocker.id);
         viewport.appendChild(node);
+        blockerNodes.set(blocker.id, node);
+      }
+    }
+    function cameraBasis() {
+      const yaw = controllerPlayer.yawDegrees * Math.PI / 180;
+      return {
+        forward: { x: Math.sin(yaw), z: Math.cos(yaw) },
+        right: { x: Math.cos(yaw), z: -Math.sin(yaw) },
+      };
+    }
+    function projectPoint(point, viewportRect) {
+      const basis = cameraBasis();
+      const dx = point.x - controllerPlayer.position.x;
+      const dz = point.z - controllerPlayer.position.z;
+      const lateral = dx * basis.right.x + dz * basis.right.z;
+      const depth = dx * basis.forward.x + dz * basis.forward.z;
+      if (depth <= 0.08) return null;
+      const focal = Math.min(viewportRect.width, viewportRect.height) * 0.82;
+      const horizon = viewportRect.height * (0.48 + controllerPlayer.pitchDegrees * 0.006);
+      return {
+        depth,
+        screenX: viewportRect.width / 2 + (lateral / depth) * focal,
+        groundY: horizon + ((controllerPlayer.position.y - 0) / depth) * focal,
+        focal,
+        horizon,
+      };
+    }
+    function renderFirstPersonScene() {
+      const viewport = document.querySelector('[data-visual-id="asha-demo-browser-viewport"]');
+      const rect = viewport.getBoundingClientRect();
+      const horizonPercent = Math.max(18, Math.min(82, 48 + controllerPlayer.pitchDegrees * 0.6));
+      viewport.style.setProperty('--horizon-y', horizonPercent.toFixed(2) + '%');
+      viewport.style.setProperty('--grid-shift-x', ((controllerPlayer.position.x * -14) % 38).toFixed(2) + 'px');
+      viewport.style.setProperty('--grid-shift-y', ((controllerPlayer.position.z * 14) % 38).toFixed(2) + 'px');
+      viewport.style.setProperty('--yaw-degrees', controllerPlayer.yawDegrees.toFixed(2) + 'deg');
+      const ordered = controllerScene.blockers
+        .map((blocker) => ({ blocker, projection: projectPoint(blocker.center, rect) }))
+        .sort((a, b) => (b.projection?.depth || -1) - (a.projection?.depth || -1));
+      for (const { blocker, projection } of ordered) {
+        const node = blockerNodes.get(blocker.id);
+        if (!node) continue;
+        if (!projection) {
+          node.style.display = 'none';
+          continue;
+        }
+        const width = Math.max(18, Math.min(rect.width * 0.9, (blocker.halfExtents.x * 2 / projection.depth) * projection.focal));
+        const height = Math.max(28, Math.min(rect.height * 0.95, (blocker.halfExtents.y * 2 / projection.depth) * projection.focal));
+        const top = projection.groundY;
+        const offscreen = projection.screenX < -width || projection.screenX > rect.width + width || top < -height || top > rect.height + height;
+        if (offscreen) {
+          node.style.display = 'none';
+          continue;
+        }
+        node.style.display = 'block';
+        node.style.width = width.toFixed(2) + 'px';
+        node.style.height = height.toFixed(2) + 'px';
+        node.style.transform = 'translate3d(' + (projection.screenX - rect.width / 2).toFixed(2) + 'px, ' + (top - rect.height / 2).toFixed(2) + 'px, 0) translate(-50%, -100%)';
+        node.style.zIndex = String(Math.max(1, 1000 - Math.round(projection.depth * 20)));
+        node.style.opacity = String(Math.max(0.34, Math.min(0.98, 1.12 - projection.depth / 28)));
+        node.dataset.cameraDepth = projection.depth.toFixed(4);
+        node.dataset.projectedScreenX = (projection.screenX / rect.width).toFixed(4);
       }
     }
     function nextSequence(eventType) {
@@ -283,6 +359,7 @@ function renderPage({ artifact }) {
       const dot = document.getElementById('firstPersonPlayerDot');
       dot.style.left = 'calc(50% + ' + (controllerPlayer.position.x * 8).toFixed(2) + 'px)';
       dot.style.top = 'calc(55% + ' + (controllerPlayer.position.z * 5).toFixed(2) + 'px)';
+      renderFirstPersonScene();
       document.body.dataset.browserGameplayFrameCount = String(frameCount);
       document.body.dataset.browserGameplayLastFrameMs = String(Math.round(lastFrameTime));
       if (pressedKeys.size > 0) {
@@ -401,10 +478,12 @@ function renderPage({ artifact }) {
     };
     window.addEventListener('keydown', (event) => {
       if (!keyToVector[event.code]) return;
-      pressedKeys.add(event.code);
-      activeMove.moveForward += keyToVector[event.code].moveForward;
-      activeMove.moveRight += keyToVector[event.code].moveRight;
-      activeMove.moveUp += keyToVector[event.code].moveUp;
+      if (!pressedKeys.has(event.code)) {
+        pressedKeys.add(event.code);
+        activeMove.moveForward += keyToVector[event.code].moveForward;
+        activeMove.moveRight += keyToVector[event.code].moveRight;
+        activeMove.moveUp += keyToVector[event.code].moveUp;
+      }
       keyboardRequest(event, 'keydown');
     });
     window.addEventListener('keyup', (event) => {
@@ -467,6 +546,7 @@ function renderPage({ artifact }) {
     });
     window.addEventListener('keydown', (event) => {
       if (event.code === 'Escape') {
+        controllerPlayer.pointerLock.requested = false;
         controllerPlayer.pointerLock.active = false;
         if (document.exitPointerLock) document.exitPointerLock();
         updateControllerReadout();

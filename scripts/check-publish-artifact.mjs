@@ -73,7 +73,7 @@ function withoutArtifactHash(artifact) {
 }
 
 function fail(message) {
-  console.error(`asha-demo publish artifact smoke failed: ${message}`);
+  console.error(`asha-testing publish artifact smoke failed: ${message}`);
   process.exit(1);
 }
 

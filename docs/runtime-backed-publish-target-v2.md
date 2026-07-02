@@ -1,6 +1,7 @@
 # Runtime-backed publish target V2
 
-This document pins the V2 runtime-backed publish target for `asha-demo`.
+This document pins the V2 runtime-backed publish target for the sample `asha-demo`
+workspace exercised by `asha-testing`.
 It is a staged selected-backend artifact, not a browser/WASM target and not an
 installer, store package, signing flow, or production bundle.
 

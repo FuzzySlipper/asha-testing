@@ -1,6 +1,6 @@
-# asha-demo boundary rules
+# asha-testing boundary rules
 
-`asha-demo` is a boundary-proof and prototype-quarantine repo for ASHA. It is not a product/game repo.
+`asha-testing` is a boundary-proof and prototype-quarantine repo for ASHA. It is not a product/game repo. The human-facing demo repo is `/home/dev/asha-demo`; keep proof harnesses, conformance evidence, and negative smokes here unless a task explicitly asks for product-demo work.
 
 Allowed imports/calls (see `boundary-policy.json` for the machine-readable list):
 
@@ -34,7 +34,7 @@ Required local/pre-merge command:
 
 ```bash
 cd ../asha/ts && pnpm install --frozen-lockfile
-cd ../../asha-demo && npm install
+cd ../../asha-testing && npm install
 npm run ci
 ```
 

@@ -81,7 +81,7 @@ The proof checker must fail closed when:
 
 ## Existing prototypes
 
-Current `asha-demo` scripts are useful prototypes but not the complete M0 proof:
+Current `asha-testing` scripts are useful prototypes but not the complete M0 proof:
 
 - `npm run camera:mover`;
 - `npm run camera:agora-control`;

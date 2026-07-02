@@ -101,8 +101,8 @@ Current handles that can feed the M0 implementation:
 - `pnpm run proof:selected-backend-command` in `asha-studio`;
 - `pnpm run proof:selected-backend-browser-smoke` in `asha-studio`;
 - `pnpm run proof:v2-live-backend-evidence` in `asha-studio`;
-- `npm run dev:smoke` and `npm run backend:authority-smoke` in `asha-demo`;
-- `npm run proof:v2-index` and `npm run verify:workflow:v2` in `asha-demo`.
+- `npm run dev:smoke` and `npm run backend:authority-smoke` in `asha-testing`;
+- `npm run proof:v2-index` and `npm run verify:workflow:v2` in `asha-testing`.
 
 ## Non-claims
 

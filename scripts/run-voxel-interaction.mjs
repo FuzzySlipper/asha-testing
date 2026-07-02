@@ -254,7 +254,7 @@ render();
 
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
 const ashaSource = readSource(path.resolve(repoRoot, '../asha'), 'asha');
-const demoSource = readSource(repoRoot, 'asha-demo');
+const demoSource = readSource(repoRoot, 'asha-testing');
 const compatibility = {
   contracts: await readCompatibility(contractsCompatibilityPath),
   runtimeBridge: await readCompatibility(runtimeCompatibilityPath),

@@ -67,9 +67,9 @@ if (!manifestResult.ok) {
 }
 
 if (failures.length > 0) {
-  console.error('asha-demo proof scene check failed:');
+  console.error('asha-testing proof scene check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log('asha-demo proof scene check: OK');
+console.log('asha-testing proof scene check: OK');

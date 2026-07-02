@@ -1,6 +1,6 @@
-# asha-demo
+# asha-testing
 
-`asha-demo` is the separate ASHA reference consumer / boundary-proof repo. It exists to prove that a repo outside `/home/dev/asha` can consume ASHA through curated public engine surfaces only.
+`asha-testing` is the separate ASHA reference consumer / boundary-proof repo. It exists to prove that a repo outside `/home/dev/asha` can consume ASHA through curated public engine surfaces only.
 
 It is **not**:
 
@@ -21,7 +21,13 @@ The approved ASHA package roots for the game-workflow scaffold are:
 - `@asha/devtools` via `file:../asha/ts/packages/devtools` or ASHA public package bundle tarball
 - `@asha/game-workspace` via `file:../asha/ts/packages/game-workspace` or ASHA public package bundle tarball
 
-`@asha/runtime-bridge` is the only package that may mediate native runtime behavior. `asha-demo` must not import `@asha/native-bridge`, `@asha/wasm-replay-bridge`, ASHA package `src/*` paths, Rust crates, or generated contract files directly.
+`@asha/runtime-bridge` is the only package that may mediate native runtime behavior. `asha-testing` must not import `@asha/native-bridge`, `@asha/wasm-replay-bridge`, ASHA package `src/*` paths, Rust crates, or generated contract files directly.
+
+Some committed artifact ids, target ids, and fixture game ids still contain
+`asha-demo` because they describe the sample product/workspace identity being
+tested. Do not read those strings as repo ownership. The human-facing demo repo
+is `/home/dev/asha-demo`; synthetic proof harnesses and conformance evidence live
+here.
 
 ## Prototype quarantine rule
 
@@ -36,11 +42,11 @@ Temporary adapters must have approval, expiry, quarantine location, evidence, re
 
 ## Commands
 
-For a fresh checkout, install the ASHA TypeScript workspace first so `@asha/runtime-bridge` can resolve its internal workspace-only transport wrapper while `asha-demo` itself still depends only on Tier 1 public packages:
+For a fresh checkout, install the ASHA TypeScript workspace first so `@asha/runtime-bridge` can resolve its internal workspace-only transport wrapper while `asha-testing` itself still depends only on Tier 1 public packages:
 
 ```bash
 cd ../asha/ts && pnpm install --frozen-lockfile
-cd ../../asha-demo && npm install
+cd ../../asha-testing && npm install
 ```
 
 Then run:
@@ -58,7 +64,7 @@ npm run verify:workflow:v2
 npm run ci
 ```
 
-`npm run ci` is also wired into `.github/workflows/boundary.yml`. The workflow checks out `asha` beside `asha-demo` so the local `file:../asha/...` public package dependencies resolve before running the conformance suite. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
+`npm run ci` is also wired into `.github/workflows/boundary.yml`. The workflow checks out `asha` beside `asha-testing` so the local `file:../asha/...` public package dependencies resolve before running the conformance suite. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
 
 ## Game workspace workflow
 

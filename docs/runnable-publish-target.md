@@ -1,9 +1,10 @@
 # Runnable publish target V1
 
-This document fixes the V1 runnable publish target for `asha-demo`. It is intentionally
-boring: a static browser bundle with a deterministic resource pack and a tiny local
-HTTP smoke. It is not an Electron package, store package, native runtime bundle, or
-performance proof.
+This document fixes the V1 runnable publish target for the sample `asha-demo`
+workspace exercised by `asha-testing`. It is intentionally boring: a static
+browser bundle with a deterministic resource pack and a tiny local HTTP smoke. It
+is not an Electron package, store package, native runtime bundle, or performance
+proof.
 
 ## Decision
 

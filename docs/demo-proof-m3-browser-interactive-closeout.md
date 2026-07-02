@@ -1,6 +1,6 @@
 # Demo Proof M3 Browser Interactive Gameplay Closeout
 
-M3 establishes a browser-visible interactive demo proof path for `asha-demo`.
+M3 establishes a browser-visible interactive demo proof path for `asha-testing`.
 It starts from an independently launchable browser page, maps real DOM input
 events to typed public ASHA request DTOs, records browser-local gameplay
 readbacks, correlates those input/readback sequences with replay-style evidence

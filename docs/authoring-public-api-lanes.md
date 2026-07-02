@@ -36,7 +36,8 @@ mutation behind a file-authoring helper.
 | `@asha/game-workspace` | `/home/dev/asha/ts/packages/game-workspace` | Manifest decode, allowed source-write roots, scene/catalog/asset authoring DTOs, path normalization, validators, save result/readback DTOs. | Runtime execution, Studio UI state, private repo crawling. |
 | `@asha/contracts` | `/home/dev/asha/ts/packages/contracts` | Stable engine-facing DTOs such as `FlatSceneDocument`, catalog/material/static-mesh/scene-object DTOs when generated from Rust contracts. | Game workspace policy, Studio read models. |
 | `@asha/runtime-bridge` | `/home/dev/asha/ts/packages/runtime-bridge` | Runtime launch/session/projection/command/replay/evidence facade. | Source-file writes, authoring save authority. |
-| `asha-demo` | `/home/dev/asha-demo` | Reference consumer, fixtures, proof commands, aggregate evidence, negative smokes. | New ASHA public APIs except by consuming package roots. |
+| `asha-testing` | `/home/dev/asha-testing` | Reference consumer, fixtures, proof commands, aggregate evidence, negative smokes. | New ASHA public APIs except by consuming package roots. |
+| `asha-demo` | `/home/dev/asha-demo` | Human-facing demos and product-content experiments built on public ASHA surfaces. | Synthetic proof harness identity or ASHA internals. |
 | `asha-studio` | `/home/dev/asha-studio` | UI orchestration, deterministic read models, agent/debug surfaces, command dispatch through public identities. | Private asset DB, raw filesystem authority, raw native/WASM transports. |
 
 ## Implemented public DTOs
@@ -105,5 +106,5 @@ Every runtime proposal API must reject or classify, without source writes, when:
   result readback. It does not walk the repo itself.
 - Studio sends runtime commands through the public command/runtime lane and records
   timeline evidence. It does not convert runtime success into source-file success.
-- `asha-demo` proof scripts may exercise the APIs and write artifacts, but those
+- `asha-testing` proof scripts may exercise the APIs and write artifacts, but those
   artifacts are evidence, not public API definitions.

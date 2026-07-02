@@ -627,7 +627,7 @@ test('publish artifact build writes compiled scene catalog and asset payloads', 
   const artifact = JSON.parse(await readFile(new URL('../harness/out/publish/latest/index.json', import.meta.url), 'utf8'));
   assert.equal(artifact.artifactKind, 'asha_demo_publish_artifact');
   assert.equal(artifact.artifactVersion, 'publish-artifact.v0');
-  assert.equal(artifact.game.id, 'asha-demo');
+  assert.equal(artifact.game.id, 'asha-testing');
   assert.equal(artifact.commands.publish, 'npm run publish:artifact');
   assert.equal(artifact.commands.verify, 'npm run conformance');
   assert.deepEqual(artifact.scenes.map((entry) => entry.scene.name), [
@@ -1785,6 +1785,8 @@ test('browser demo launch target emits a standalone page and launch artifact', a
   assert.match(page, /data-browser-controls-ready="true"/);
   assert.match(page, /data-browser-gameplay-loop-ready="true"/);
   assert.match(page, /data-first-person-controller-ready="true"/);
+  assert.match(page, /data-human-play-mode/);
+  assert.match(page, /humanPlayMode/);
   assert.match(page, /asha-demo-controller-readout/);
   assert.match(page, /browser-demo-launch-ready/);
   assert.match(page, /window\.ashaDemoBrowserLaunch/);
@@ -1883,11 +1885,18 @@ test('browser first-person controller proof script is registered', () => {
     packageJson.scripts['browser:first-person-controller-proof'],
     'node scripts/run-first-person-controller-proof.mjs',
   );
+  assert.equal(
+    packageJson.scripts['browser:play'],
+    'node scripts/serve-browser-play.mjs',
+  );
   const source = fs.readFileSync(new URL('../scripts/run-first-person-controller-proof.mjs', import.meta.url), 'utf8');
+  const serveSource = fs.readFileSync(new URL('../scripts/serve-browser-play.mjs', import.meta.url), 'utf8');
   assert.match(source, /asha_demo_first_person_controller_proof/);
   assert.match(source, /pointer_lock_requested_by_viewport_click/);
   assert.match(source, /cube_collision_prevents_penetration/);
   assert.match(source, /not_runtime_authoritative_collision/);
+  assert.match(serveSource, /0\.0\.0\.0/);
+  assert.match(serveSource, /index\.html\?play=1/);
 });
 
 test('authored round-trip fixture loads into browser runtime readback', async () => {

@@ -1,6 +1,6 @@
 # ASHA engine feature request template
 
-Use this when `asha-demo` or a future consumer cannot complete a task through the current ASHA public surfaces.
+Use this when `asha-testing`, `asha-demo`, or a future consumer cannot complete a task through the current ASHA public surfaces.
 
 Missing public surface ≠ permission to import ASHA internals. File this request before adding a workaround.
 

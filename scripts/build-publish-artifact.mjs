@@ -42,7 +42,7 @@ function isPublishProofScene(scene) {
 }
 
 function failClosed(message, diagnostics = []) {
-  console.error('asha-demo publish artifact build failed:');
+  console.error('asha-testing publish artifact build failed:');
   console.error(`- ${message}`);
   for (const diagnostic of diagnostics) {
     console.error(`- ${diagnostic.code ?? 'diagnostic'} at ${diagnostic.path ?? 'unknown'}: ${diagnostic.message ?? JSON.stringify(diagnostic)}`);

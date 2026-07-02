@@ -83,9 +83,9 @@ if (!existsSync(manifestPath)) {
 }
 
 if (failures.length > 0) {
-  console.error('asha-demo manifest check failed:');
+  console.error('asha-testing manifest check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log('asha-demo manifest check: OK');
+console.log('asha-testing manifest check: OK');

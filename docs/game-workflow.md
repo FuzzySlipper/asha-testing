@@ -1,10 +1,15 @@
 # ASHA game workflow V1/V2
 
-`asha-demo` is a boundary-proof reference consumer, not a product game. The V1/V2
+`asha-testing` is a boundary-proof reference consumer, not a product game. The V1/V2
 workflow proves that a game-shaped workspace can be validated, inspected by Studio,
 debugged through typed devtools attach messages, resolved through dev/publish
 resource profiles, run through a manifest-selected native backend, and published
 into deterministic runnable/staged evidence without importing ASHA internals.
+
+The harness still uses `asha-demo` in some artifact ids, target ids, and sample
+game ids because those strings describe the historical demo-shaped workspace
+under test. They are not the repo role. Human-facing demos now belong in
+`/home/dev/asha-demo`.
 
 ## Workspace manifest
 
