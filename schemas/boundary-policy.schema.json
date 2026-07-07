@@ -9,23 +9,10 @@
     "typescript": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["allowedPackages", "unstableDemoPackages", "forbiddenPackages"],
+      "required": ["consumerRole", "publicSurfaceManifest"],
       "properties": {
-        "allowedPackages": {
-          "type": "array",
-          "items": { "type": "string", "pattern": "^@asha/" },
-          "uniqueItems": true
-        },
-        "unstableDemoPackages": {
-          "type": "array",
-          "items": { "type": "string", "pattern": "^@asha/" },
-          "uniqueItems": true
-        },
-        "forbiddenPackages": {
-          "type": "array",
-          "items": { "type": "string", "pattern": "^@asha/" },
-          "uniqueItems": true
-        }
+        "consumerRole": { "type": "string", "pattern": "^asha-" },
+        "publicSurfaceManifest": { "type": "string", "minLength": 1 }
       }
     },
     "rust": {

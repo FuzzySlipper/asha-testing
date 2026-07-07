@@ -14,9 +14,9 @@ import {
 } from '@asha/game-workspace';
 import {
   createNativeGameRuntimeLauncher,
-  createReferenceGameRuntimeLauncher,
   frameCursor,
 } from '@asha/runtime-bridge';
+import { createReferenceGameRuntimeLauncher } from '@asha/runtime-bridge/reference';
 
 import { createJsonWebSocketServer } from './devtools-ws.mjs';
 

@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseAshaGameManifestToml } from '@asha/game-workspace';
-import { createReferenceGameRuntimeLauncher } from '@asha/runtime-bridge';
+import { createReferenceGameRuntimeLauncher } from '@asha/runtime-bridge/reference';
 
 const repoRoot = resolve(dirname(new URL(import.meta.url).pathname), '..');
 const outDir = join(repoRoot, 'harness/out/backend-authority-smoke/latest');

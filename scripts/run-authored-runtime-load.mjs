@@ -7,7 +7,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { parseAshaGameManifestToml } from '@asha/game-workspace';
-import { createReferenceGameRuntimeLauncher, frameCursor } from '@asha/runtime-bridge';
+import { frameCursor } from '@asha/runtime-bridge';
+import { createReferenceGameRuntimeLauncher } from '@asha/runtime-bridge/reference';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const studioRoot = path.resolve(repoRoot, '../asha-studio');

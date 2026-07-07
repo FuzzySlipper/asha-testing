@@ -46,9 +46,9 @@
     "test": "node --test --test-concurrency=1 tests/*.test.mjs && npm run check:boundary"
   },
   "dependencies": {
-    "@asha/contracts": "file:../asha/ts/packages/contracts",
-    "@asha/devtools": "file:../asha/ts/packages/devtools",
-    "@asha/game-workspace": "file:../asha/ts/packages/game-workspace",
-    "@asha/runtime-bridge": "file:../asha/ts/packages/runtime-bridge"
+    "@asha/contracts": "file:../asha-engine/ts/packages/contracts",
+    "@asha/devtools": "file:../asha-engine/ts/packages/devtools",
+    "@asha/game-workspace": "file:../asha-engine/ts/packages/game-workspace",
+    "@asha/runtime-bridge": "file:../asha-engine/ts/packages/runtime-bridge"
   }
 }

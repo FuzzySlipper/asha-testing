@@ -7,7 +7,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseAshaGameManifestToml, validateAshaGameAssetCatalog } from '@asha/game-workspace';
-import { MANIFEST_OPERATIONS, createReferenceGameRuntimeLauncher, frameCursor } from '@asha/runtime-bridge';
+import { MANIFEST_OPERATIONS, frameCursor } from '@asha/runtime-bridge';
+import { createReferenceGameRuntimeLauncher } from '@asha/runtime-bridge/reference';
 import {
   buildControllerReadout,
   createFirstPersonPlayerState,

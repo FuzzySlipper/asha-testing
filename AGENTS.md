@@ -33,7 +33,7 @@ If the public ASHA surface cannot express the test, create an engine feature req
 Required local/pre-merge command:
 
 ```bash
-cd ../asha/ts && pnpm install --frozen-lockfile
+cd ../asha-engine/ts && pnpm install --frozen-lockfile
 cd ../../asha-testing && npm install
 npm run ci
 ```

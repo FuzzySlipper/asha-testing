@@ -30,7 +30,7 @@ Generated/cache/evidence outputs are not authoring source of truth:
 - `harness/out/publish/**`;
 - `harness/out/v2-proof-index/**`;
 - `node_modules/**`;
-- sibling repos such as `../asha`, `../asha-studio`, and private runtime transport
+- sibling repos such as `../asha-engine`, `../asha-studio`, and private runtime transport
   paths.
 
 ## Allowed write roots
@@ -48,7 +48,7 @@ Every save must normalize the requested relative path and fail closed when it:
 - contains `..`;
 - resolves outside the repo root;
 - resolves outside the allowed root for the operation;
-- targets `harness/out`, `node_modules`, `.git`, `../asha`, `../asha-studio`, or
+- targets `harness/out`, `node_modules`, `.git`, `../asha-engine`, `../asha-studio`, or
   any raw native/WASM transport path;
 - writes a file extension not owned by the selected format.
 

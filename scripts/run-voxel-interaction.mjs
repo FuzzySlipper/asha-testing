@@ -10,9 +10,9 @@ import '@asha/contracts';
 import {
   MANIFEST_OPERATIONS,
   STABLE_OPERATION_COUNT,
-  createMockRuntimeBridge,
   frameCursor,
 } from '@asha/runtime-bridge';
+import { createMockRuntimeBridge } from '@asha/runtime-bridge/reference';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturePath = path.join(repoRoot, 'harness/conformance/fixtures/minimal-world.json');
@@ -253,7 +253,7 @@ render();
 }
 
 const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
-const ashaSource = readSource(path.resolve(repoRoot, '../asha'), 'asha');
+const ashaSource = readSource(path.resolve(repoRoot, '../asha-engine'), 'asha');
 const demoSource = readSource(repoRoot, 'asha-testing');
 const compatibility = {
   contracts: await readCompatibility(contractsCompatibilityPath),

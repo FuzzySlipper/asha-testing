@@ -51,10 +51,10 @@ function rehashV2ProofIndex(index) {
 
 test('scaffold depends only on Tier 1 ASHA public TypeScript surfaces', () => {
   assert.deepEqual(packageJson.dependencies, {
-    '@asha/contracts': 'file:../asha/ts/packages/contracts',
-    '@asha/devtools': 'file:../asha/ts/packages/devtools',
-    '@asha/game-workspace': 'file:../asha/ts/packages/game-workspace',
-    '@asha/runtime-bridge': 'file:../asha/ts/packages/runtime-bridge',
+    '@asha/contracts': 'file:../asha-engine/ts/packages/contracts',
+    '@asha/devtools': 'file:../asha-engine/ts/packages/devtools',
+    '@asha/game-workspace': 'file:../asha-engine/ts/packages/game-workspace',
+    '@asha/runtime-bridge': 'file:../asha-engine/ts/packages/runtime-bridge',
   });
 });
 
@@ -65,12 +65,8 @@ test('repo declares itself private and non-product', () => {
 
 test('boundary policy is machine-readable and owns the public ASHA allow list', async () => {
   const policy = JSON.parse(await readFile(new URL('../boundary-policy.json', import.meta.url), 'utf8'));
-  assert.deepEqual(policy.typescript.allowedPackages, [
-    '@asha/contracts',
-    '@asha/runtime-bridge',
-    '@asha/devtools',
-    '@asha/game-workspace',
-  ]);
+  assert.equal(policy.typescript.consumerRole, 'asha-testing');
+  assert.equal(policy.typescript.publicSurfaceManifest, '../asha-engine/harness/public-surface/ts-packages.json');
   assert.deepEqual(policy.rust.allowedCrates, []);
   assert.match(policy.remediation, /public package roots/);
 });
@@ -82,13 +78,13 @@ test('boundary checker accepts intended public package roots for game workflow',
   const allowedFile = new URL('../src/allowed-public.mjs', import.meta.url);
   try {
     const mutated = JSON.parse(original);
-    mutated.dependencies['@asha/devtools'] = 'file:../asha/ts/packages/devtools';
-    mutated.dependencies['@asha/game-workspace'] = 'file:../asha/ts/packages/game-workspace';
+    mutated.dependencies['@asha/devtools'] = 'file:../asha-engine/ts/packages/devtools';
+    mutated.dependencies['@asha/game-workspace'] = 'file:../asha-engine/ts/packages/game-workspace';
     await writeFile(packageJsonUrl, `${JSON.stringify(mutated, null, 2)}\n`);
     await mkdir(srcDir, { recursive: true });
     await writeFile(
       allowedFile,
-      `import { ASHA_DEVTOOLS_PROTOCOL_VERSION } from '@asha/devtools';\nimport { parseAshaGameManifestToml } from '@asha/game-workspace';\nvoid ASHA_DEVTOOLS_PROTOCOL_VERSION;\nvoid parseAshaGameManifestToml;\n`,
+      `import { ASHA_DEVTOOLS_PROTOCOL_VERSION } from '@asha/devtools';\nimport { parseAshaGameManifestToml } from '@asha/game-workspace';\nimport { createMockRuntimeBridge } from '@asha/runtime-bridge/reference';\nvoid ASHA_DEVTOOLS_PROTOCOL_VERSION;\nvoid parseAshaGameManifestToml;\nvoid createMockRuntimeBridge;\n`,
     );
 
     const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
@@ -150,7 +146,7 @@ test('boundary checker rejects forbidden ASHA package dependencies', async () =>
   const forbiddenPackage = '@asha/' + 'wasm-replay-bridge';
   try {
     const mutated = JSON.parse(original);
-    mutated.dependencies[forbiddenPackage] = 'file:../asha/ts/packages/wasm-replay-bridge';
+    mutated.dependencies[forbiddenPackage] = 'file:../asha-engine/ts/packages/wasm-replay-bridge';
     await writeFile(packageJsonUrl, `${JSON.stringify(mutated, null, 2)}\n`);
     const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
       cwd: repoRoot,
@@ -169,7 +165,7 @@ test('boundary checker rejects ASHA package-root dependency aliases', async () =
   const original = await readFile(packageJsonUrl, 'utf8');
   try {
     const mutated = JSON.parse(original);
-    mutated.dependencies['evil-native'] = 'file:../asha/ts/packages/native-bridge';
+    mutated.dependencies['evil-native'] = 'file:../asha-engine/ts/packages/native-bridge';
     await writeFile(packageJsonUrl, `${JSON.stringify(mutated, null, 2)}\n`);
     const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
       cwd: repoRoot,
@@ -211,7 +207,7 @@ test('boundary checker rejects forbidden Rust Cargo path dependencies', async ()
   try {
     await writeFile(
       cargoToml,
-      `[package]\nname = "asha-demo-boundary-probe"\nversion = "0.0.0"\nedition = "2021"\n\n[dependencies]\n${forbiddenCrate} = { path = "../asha/engine-rs/crates/state/state-store" }\n`,
+      `[package]\nname = "asha-demo-boundary-probe"\nversion = "0.0.0"\nedition = "2021"\n\n[dependencies]\n${forbiddenCrate} = { path = "../asha-engine/engine-rs/crates/state/state-store" }\n`,
     );
     const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
       cwd: repoRoot,
@@ -231,7 +227,7 @@ test('boundary checker rejects forbidden Rust Cargo dependency subtable paths', 
   try {
     await writeFile(
       cargoToml,
-      `[package]\nname = "asha-demo-boundary-probe"\nversion = "0.0.0"\nedition = "2021"\n\n[dependencies.${forbiddenCrate}]\npath = "../asha/engine-rs/crates/state/state-store"\n`,
+      `[package]\nname = "asha-demo-boundary-probe"\nversion = "0.0.0"\nedition = "2021"\n\n[dependencies.${forbiddenCrate}]\npath = "../asha-engine/engine-rs/crates/state/state-store"\n`,
     );
     const result = spawnSync(process.execPath, ['scripts/check-boundary.mjs'], {
       cwd: repoRoot,
@@ -248,7 +244,7 @@ test('boundary checker rejects forbidden Rust Cargo dependency subtable paths', 
 test('boundary checker rejects private ASHA TypeScript source imports', async () => {
   const srcDir = new URL('../src/', import.meta.url);
   const badFile = new URL('../src/private-source.mjs', import.meta.url);
-  const privateImport = '../asha/ts/packages/runtime-bridge' + '/src/index.ts';
+  const privateImport = '../asha-engine/ts/packages/runtime-bridge' + '/src/index.ts';
   await mkdir(srcDir, { recursive: true });
   try {
     await writeFile(
@@ -282,7 +278,7 @@ test('manifest checker fails closed on invalid source-write roots', async () => 
   try {
     await writeFile(
       manifestUrl,
-      original.replace('allowed_source_writes = ["scenes", "assets", "packages/game-catalogs", "packages/game-policy"]', 'allowed_source_writes = ["../asha/engine-rs"]'),
+      original.replace('allowed_source_writes = ["scenes", "assets", "packages/game-catalogs", "packages/game-policy"]', 'allowed_source_writes = ["../asha-engine/engine-rs"]'),
     );
     const result = spawnSync(process.execPath, ['scripts/check-manifest.mjs'], {
       cwd: repoRoot,
@@ -1536,7 +1532,7 @@ test('M1.1 bounded workspace persistence contract is public and fail-closed', as
 
   for (const [relativePath, code] of [
     ['harness/out/generated.scene.json', 'forbidden_generated_path'],
-    ['../asha/private/catalog.json', 'disallowed_path'],
+    ['../asha-engine/private/catalog.json', 'disallowed_path'],
     ['assets/mesh.txt', 'invalid_extension'],
     ['assets/@asha/native-bridge/native-bridge.node', 'private_transport_hint'],
     ['packages/game-policy/rules.json', 'unsupported_operation'],

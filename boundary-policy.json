@@ -1,44 +1,28 @@
 {
   "$schema": "./schemas/boundary-policy.schema.json",
   "typescript": {
-    "allowedPackages": [
-      "@asha/contracts",
-      "@asha/runtime-bridge",
-      "@asha/devtools",
-      "@asha/game-workspace"
-    ],
-    "unstableDemoPackages": ["@asha/renderer-three"],
-    "forbiddenPackages": [
-      "@asha/native-bridge",
-      "@asha/wasm-replay-bridge",
-      "@asha/app",
-      "@asha/electron-main",
-      "@asha/ui-dom",
-      "@asha/policy-core",
-      "@asha/policy-examples",
-      "@asha/script-host",
-      "@asha/catalog-examples"
-    ]
+    "consumerRole": "asha-testing",
+    "publicSurfaceManifest": "../asha-engine/harness/public-surface/ts-packages.json"
   },
   "rust": {
     "allowedCrates": [],
     "allowedAshaPaths": [],
     "forbiddenPathFragments": [
-      "../asha/engine-rs/crates/foundation/",
-      "../asha/engine-rs/crates/state/",
-      "../asha/engine-rs/crates/sim/",
-      "../asha/engine-rs/crates/services/",
-      "../asha/engine-rs/crates/rules/",
-      "../asha/engine-rs/crates/render/",
-      "../asha/engine-rs/crates/bridge/native-bridge",
-      "../asha/engine-rs/crates/wasm/wasm-api",
-      "../asha/engine-rs/crates/tools/"
+      "../asha-engine/engine-rs/crates/foundation/",
+      "../asha-engine/engine-rs/crates/state/",
+      "../asha-engine/engine-rs/crates/sim/",
+      "../asha-engine/engine-rs/crates/services/",
+      "../asha-engine/engine-rs/crates/rules/",
+      "../asha-engine/engine-rs/crates/render/",
+      "../asha-engine/engine-rs/crates/bridge/native-bridge",
+      "../asha-engine/engine-rs/crates/wasm/wasm-api",
+      "../asha-engine/engine-rs/crates/tools/"
     ]
   },
   "pathRules": {
     "forbiddenFragments": [
-      "../asha/ts/packages/*/src/",
-      "../asha/engine-rs/crates/*/src/",
+      "../asha-engine/ts/packages/*/src/",
+      "../asha-engine/engine-rs/crates/*/src/",
       "ts/packages/contracts/src/generated"
     ]
   },

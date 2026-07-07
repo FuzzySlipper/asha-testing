@@ -24,7 +24,7 @@ pnpm run check:boundaries
 pnpm exec nx test studio-app
 ```
 
-Run from `/home/dev/asha/ts/packages/game-workspace`:
+Run from `/home/dev/asha-engine/ts/packages/game-workspace`:
 
 ```bash
 npm test

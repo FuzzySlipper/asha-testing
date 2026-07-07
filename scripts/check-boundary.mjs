@@ -8,17 +8,21 @@ const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
 const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 const failures = [];
 
-const allowedAshaPackages = new Set(policy.typescript.allowedPackages ?? []);
-const unstableDemoPackages = new Set(policy.typescript.unstableDemoPackages ?? []);
-const forbiddenAshaPackages = new Set(policy.typescript.forbiddenPackages ?? []);
+const publicSurfacePolicy = loadPublicSurfacePolicy(policy.typescript ?? {});
+const allowedAshaPackages = publicSurfacePolicy.approvedPackageRoots;
+const allowedAshaSpecifiers = publicSurfacePolicy.approvedSpecifiers;
+const forbiddenAshaPackages = publicSurfacePolicy.forbiddenPackageRoots;
 const allowedAshaPackagePaths = new Set(
-  [...allowedAshaPackages].map((packageName) => `../asha/ts/packages/${packageName.replace('@asha/', '')}`),
+  [...allowedAshaPackages].map((packageName) => `../asha-engine/ts/packages/${packageName.replace('@asha/', '')}`),
 );
-const knownAshaPackageRoot = '../asha/ts/packages/';
+const knownAshaPackageRoot = '../asha-engine/ts/packages/';
 const allowedRustCrates = new Set(policy.rust.allowedCrates ?? []);
 const allowedAshaPaths = (policy.rust.allowedAshaPaths ?? []).map(normalizePath);
 const forbiddenRustPathFragments = (policy.rust.forbiddenPathFragments ?? []).map(normalizePath);
-const forbiddenPathFragments = policy.pathRules?.forbiddenFragments ?? [];
+const forbiddenPathFragments = [
+  ...(policy.pathRules?.forbiddenFragments ?? []),
+  ...publicSurfacePolicy.forbiddenSpecifierPatterns,
+];
 const remediation = policy.remediation ?? 'Use public ASHA surfaces or file an engine feature request.';
 
 function fail(message) {
@@ -44,7 +48,7 @@ function isAllowedAshaRustPath(spec) {
 
 function isForbiddenAshaRustPath(spec) {
   const normalized = normalizePath(spec);
-  if (!normalized.includes('../asha/engine-rs/crates/')) return false;
+  if (!normalized.includes('../asha-engine/engine-rs/crates/')) return false;
   if (isAllowedAshaRustPath(normalized)) return false;
   if (forbiddenRustPathFragments.some((fragment) => normalized.includes(fragment))) return true;
   return true;
@@ -54,12 +58,38 @@ function normalizeDependencySpec(spec) {
   return normalizePath(String(spec)).replace(/^file:/, '');
 }
 
+function ashaPackageRoot(spec) {
+  return spec.split('/').slice(0, 2).join('/');
+}
+
+function loadPublicSurfacePolicy(typescriptPolicy) {
+  const consumerRole = typescriptPolicy.consumerRole ?? 'asha-testing';
+  const manifestPath = path.resolve(repoRoot, typescriptPolicy.publicSurfaceManifest ?? '../asha-engine/harness/public-surface/ts-packages.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const consumerPolicy = (manifest.consumerPolicies ?? []).find((entry) => entry.consumerRole === consumerRole);
+  if (consumerPolicy === undefined) {
+    throw new Error(`ASHA public-surface manifest ${manifestPath} has no consumer policy for ${consumerRole}`);
+  }
+  const approvedPackageRoots = new Set(consumerPolicy.approvedPackageRoots ?? []);
+  const forbiddenPackageRoots = new Set(consumerPolicy.forbiddenPackageRoots ?? []);
+  const approvedSpecifiers = new Set(approvedPackageRoots);
+  for (const specifier of consumerPolicy.approvedPackageSubpaths ?? []) {
+    if (typeof specifier === 'string') {
+      approvedSpecifiers.add(specifier);
+    }
+  }
+  return {
+    approvedPackageRoots,
+    approvedSpecifiers,
+    forbiddenPackageRoots,
+    forbiddenSpecifierPatterns: consumerPolicy.forbiddenSpecifierPatterns ?? [],
+  };
+}
+
 function validateAshaPackageName(context, packageName) {
   if (!packageName.startsWith('@asha/')) return;
   if (allowedAshaPackages.has(packageName)) return;
-  if (unstableDemoPackages.has(packageName)) {
-    fail(`${context} targets unstable ASHA demo package ${packageName} without explicit task approval`);
-  } else if (forbiddenAshaPackages.has(packageName)) {
+  if (forbiddenAshaPackages.has(packageName)) {
     fail(`${context} targets forbidden ASHA package ${packageName}`);
   } else {
     fail(`${context} targets non-approved ASHA package ${packageName}`);
@@ -84,7 +114,7 @@ function validateDependencySpec(section, name, spec) {
       validateAshaPackageName(`${section}.${name} path dependency`, targetPackage);
     }
   }
-  if (/\.\.\/asha\/.+\/src\//.test(normalizedSpec)) {
+  if (/\.\.\/(?:asha-engine|asha)\/.+\/src\//.test(normalizedSpec)) {
     fail(`${section}.${name} points at an ASHA source internals path: ${spec}`);
   }
 }
@@ -120,17 +150,19 @@ function walk(dir, predicate = () => true) {
 
 function checkImportSpec(rel, spec) {
   const normalizedSpec = normalizePath(spec);
-  if (normalizedSpec.startsWith('@asha/') && !allowedAshaPackages.has(normalizedSpec)) {
-    if (unstableDemoPackages.has(normalizedSpec)) {
-      fail(`${rel} imports unstable ASHA demo package ${normalizedSpec} without explicit task approval`);
-    } else {
-      fail(`${rel} imports non-approved ASHA package ${normalizedSpec}`);
+  if (normalizedSpec.startsWith('@asha/')) {
+    const packageRoot = ashaPackageRoot(normalizedSpec);
+    if (!allowedAshaSpecifiers.has(normalizedSpec)) {
+      if (forbiddenAshaPackages.has(packageRoot)) {
+        fail(`${rel} imports forbidden ASHA package ${normalizedSpec}`);
+      } else {
+        fail(`${rel} imports non-approved ASHA package ${normalizedSpec}`);
+      }
+    } else if (forbiddenAshaPackages.has(packageRoot)) {
+      fail(`${rel} imports forbidden ASHA package ${normalizedSpec}`);
     }
   }
-  if (forbiddenAshaPackages.has(normalizedSpec)) {
-    fail(`${rel} imports forbidden ASHA package ${normalizedSpec}`);
-  }
-  if (/\.\.\/asha\/.+\/src\//.test(normalizedSpec)) {
+  if (/\.\.\/(?:asha-engine|asha)\/.+\/src\//.test(normalizedSpec)) {
     fail(`${rel} imports ASHA internals by source path: ${spec}`);
   }
   if (/ts\/packages\/contracts\/src\/generated/.test(normalizedSpec)) {
@@ -212,12 +244,12 @@ for (const cargoFile of walk(repoRoot, (full) => path.basename(full) === 'Cargo.
   const rel = path.relative(repoRoot, cargoFile);
   const text = fs.readFileSync(cargoFile, 'utf8');
   for (const entry of parseCargoDependencyEntries(text)) {
-    if (entry.pathSpec && normalizePath(entry.pathSpec).includes('../asha/engine-rs/crates/')) {
+    if (entry.pathSpec && normalizePath(entry.pathSpec).includes('../asha-engine/engine-rs/crates/')) {
       if (!allowedRustCrates.has(entry.crateName) || isForbiddenAshaRustPath(entry.pathSpec)) {
         fail(`${rel} ${entry.section}.${entry.crateName} depends on forbidden ASHA Rust crate path ${entry.pathSpec}`);
       }
     }
-    if (entry.pathSpec && /\.\.\/asha\/.+\/src\//.test(normalizePath(entry.pathSpec))) {
+    if (entry.pathSpec && /\.\.\/(?:asha-engine|asha)\/.+\/src\//.test(normalizePath(entry.pathSpec))) {
       fail(`${rel} ${entry.section}.${entry.crateName} points at an ASHA Rust source internals path ${entry.pathSpec}`);
     }
   }

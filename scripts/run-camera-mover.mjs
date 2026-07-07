@@ -10,9 +10,9 @@ import '@asha/contracts';
 import {
   MANIFEST_OPERATIONS,
   STABLE_OPERATION_COUNT,
-  createMockRuntimeBridge,
   frameCursor,
 } from '@asha/runtime-bridge';
+import { createMockRuntimeBridge } from '@asha/runtime-bridge/reference';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturePath = path.join(repoRoot, 'harness/conformance/fixtures/minimal-world.json');
@@ -76,7 +76,7 @@ function gitOutput(cwd, args) {
 }
 
 function readAshaSource() {
-  const ashaPath = path.resolve(repoRoot, '../asha');
+  const ashaPath = path.resolve(repoRoot, '../asha-engine');
   return {
     path: ashaPath,
     branch: gitOutput(ashaPath, ['branch', '--show-current']),

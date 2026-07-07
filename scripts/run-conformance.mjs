@@ -17,10 +17,10 @@ import {
 import {
   RuntimeBridgeError,
   STABLE_OPERATION_COUNT,
-  createMockRuntimeBridge,
   createNativeRuntimeBridge,
   frameCursor,
 } from '@asha/runtime-bridge';
+import { createMockRuntimeBridge } from '@asha/runtime-bridge/reference';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixturePath = path.join(repoRoot, 'harness/conformance/fixtures/minimal-world.json');
@@ -534,7 +534,7 @@ const sceneSource = JSON.parse(await readFile(scenePath, 'utf8'));
 assert.equal(sceneSource.sceneId, fixture.sceneId);
 const assetResolutions = sceneSource.catalogAssetIds.map((assetId) => resolveAshaGameAssetForDev(catalogValidation.catalog, assetId));
 assert.equal(assetResolutions.every((resolution) => resolution !== null), true);
-const ashaSource = readSource(path.resolve(repoRoot, '../asha'), 'asha');
+const ashaSource = readSource(path.resolve(repoRoot, '../asha-engine'), 'asha');
 const demoSource = readSource(repoRoot, 'asha-testing');
 const compatibility = {
   contracts: await readCompatibility(contractsCompatibilityPath),
