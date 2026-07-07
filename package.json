@@ -18,6 +18,7 @@
     "roundtrip:runtime-load": "node scripts/run-authored-runtime-load.mjs",
     "roundtrip:browser-interaction": "node scripts/run-authored-browser-interaction.mjs",
     "voxel:interaction": "node scripts/run-voxel-interaction.mjs",
+    "voxel:conversion-matrix": "node scripts/run-voxel-conversion-matrix.mjs",
     "check:boundary": "node scripts/check-boundary.mjs",
     "check:assets": "node scripts/check-assets.mjs",
     "check:manifest": "node scripts/check-manifest.mjs",
