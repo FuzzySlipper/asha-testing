@@ -64,7 +64,7 @@ npm run verify:workflow:v2
 npm run ci
 ```
 
-`npm run ci` is also wired into `.github/workflows/boundary.yml`. The workflow checks out `asha-engine` beside `asha-testing` so the local `file:../asha-engine/...` public package dependencies resolve before running the conformance suite. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
+`.github/workflows/boundary.yml` runs `npm run ci:boundary`. The workflow checks out `asha-engine` beside `asha-testing` so the local `file:../asha-engine/...` public package dependencies resolve before running the focused boundary gate. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
 
 ## Game workspace workflow
 
