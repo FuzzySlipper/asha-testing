@@ -52,6 +52,25 @@ cd ../../asha-testing && npm install
 Then run:
 
 ```bash
+npm run ci
+```
+
+`npm run ci` is the deployment-safe boundary gate for fresh checkouts; it
+currently aliases `npm run ci:boundary`. `.github/workflows/boundary.yml` runs
+the same focused boundary gate. The workflow checks out `asha-engine` beside
+`asha-testing` so the local `file:../asha-engine/...` public package
+dependencies resolve before verification. The boundary check fails closed on
+unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports,
+generated-contract file-path imports, generic runtime JSON tunnels, and ASHA
+Rust crate path dependencies.
+
+Broader conformance, publish, backend, and aggregate evidence commands are not
+fresh-checkout deployment gates. Run them only when their prerequisites are
+available: current native runtime bridge exports, required sibling Studio
+artifacts, and the relevant generated `harness/out/**` evidence inputs. Those
+commands include:
+
+```bash
 npm test
 npm run conformance
 npm run backend:authority-smoke
@@ -59,12 +78,8 @@ npm run camera:mover
 npm run dev:smoke
 npm run publish:evidence
 npm run proof:v2-index
-npm run check:boundary
 npm run verify:workflow:v2
-npm run ci
 ```
-
-`.github/workflows/boundary.yml` runs `npm run ci:boundary`. The workflow checks out `asha-engine` beside `asha-testing` so the local `file:../asha-engine/...` public package dependencies resolve before running the focused boundary gate. The boundary check fails closed on unapproved `@asha/*` dependencies/imports, direct ASHA `src/*` path imports, generated-contract file-path imports, generic runtime JSON tunnels, and ASHA Rust crate path dependencies.
 
 ## Game workspace workflow
 

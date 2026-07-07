@@ -35,7 +35,7 @@ Required local/pre-merge command:
 ```bash
 cd ../asha-engine/ts && pnpm install --frozen-lockfile
 cd ../../asha-testing && npm install
-npm run ci:boundary
+npm run ci
 ```
 
 For the conformance harness specifically:
