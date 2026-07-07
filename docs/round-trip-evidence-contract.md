@@ -114,7 +114,7 @@ The M0 capstone should consume, not replace:
 - `npm run verify:workflow:v2`;
 - `npm run proof:v2-index`;
 - `npm run publish:evidence`;
-- `pnpm run proof:v2-live-backend-evidence` in `asha-studio`.
+- `pnpm run evidence:v2-live-backend` in `asha-studio`.
 
 V1 aggregate compatibility must remain runnable, but the M0 capstone may require
 the V2 selected-backend proof stack.

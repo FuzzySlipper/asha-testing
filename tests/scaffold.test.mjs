@@ -1431,7 +1431,7 @@ test('M0 demo proof inventory records current authoring runtime and browser seam
   assert.match(doc, /validateAshaGameAssetCatalog/);
   assert.match(doc, /StudioSceneObjectSnapshot/);
   assert.match(doc, /createNativeGameRuntimeLauncher/);
-  assert.match(doc, /pnpm run proof:v2-live-backend-evidence/);
+  assert.match(doc, /pnpm run evidence:v2-live-backend/);
   assert.match(doc, /npm run publish:backend-run-smoke/);
   assert.match(doc, /npm run proof:v2-index/);
   assert.match(doc, /Browser interaction proof prototypes/);
@@ -1594,7 +1594,7 @@ test('Studio live debug inspector contract pins surfaces freshness and negative 
   assert.match(doc, /stale_fixture_readback/);
   assert.match(doc, /unsupported_debug_command/);
   assert.match(doc, /private_transport_hint/);
-  assert.match(doc, /pnpm run proof:v2-live-backend-evidence/);
+  assert.match(doc, /pnpm run evidence:v2-live-backend/);
   assert.match(inventory, /studio-live-debug-inspector-contract\.md/);
 });
 

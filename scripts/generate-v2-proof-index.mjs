@@ -67,7 +67,7 @@ const commands = {
   backendAuthority: run('npm', ['run', 'backend:authority-smoke']),
   publishEvidence: run('npm', ['run', 'publish:evidence']),
   publishEvidenceCheck: run('npm', ['run', 'publish:evidence-check']),
-  studioLive: run('pnpm', ['run', 'proof:v2-live-backend-evidence'], studioRoot),
+  studioLive: run('pnpm', ['run', 'evidence:v2-live-backend'], studioRoot),
   aggregateV1: run('npm', ['run', 'verify:workflow:v1']),
 };
 for (const result of Object.values(commands)) {
