@@ -8,6 +8,7 @@ engine_source = "../asha"
 
 [workspace]
 scene_roots = ["scenes"]
+prefab_roots = ["prefabs"]
 asset_roots = ["assets"]
 replay_roots = ["replays"]
 catalog_packages = ["packages/game-catalogs"]
@@ -24,7 +25,7 @@ backend_proof_refs = ["proof:dev-authority-smoke"]
 [studio]
 workspace_mode = true
 attach_enabled = true
-allowed_source_writes = ["scenes", "assets", "packages/game-catalogs", "packages/game-policy"]
+allowed_source_writes = ["scenes", "prefabs", "assets", "packages/game-catalogs", "packages/game-policy"]
 
 [publish]
 command = "npm run publish:artifact"
@@ -32,7 +33,7 @@ artifact_dir = "harness/out"
 verify_command = "npm run conformance"
 
 [dev_resource_profile]
-local_roots = ["assets", "packages/game-catalogs"]
+local_roots = ["prefabs", "assets", "packages/game-catalogs"]
 cache_dir = "harness/out/dev-cache"
 resolution_policy = "prefer-source"
 
