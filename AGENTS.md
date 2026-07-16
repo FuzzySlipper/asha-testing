@@ -17,81 +17,46 @@
 
 # ASHA Testing Local Bootstrap
 
-`asha-testing` is a boundary-proof and prototype-quarantine repo for ASHA. It is not a product/game repo. The human-facing demo repo is `/home/dev/asha-demo`; keep proof harnesses, conformance evidence, and negative smokes here unless a task explicitly asks for product-demo work.
+`asha-testing` owns focused synthetic regressions against public ASHA consumer
+surfaces. It is not a product/game repository and must not claim that Demo
+gameplay or Studio authoring is delivered.
 
-Use Den project ID `asha` for tasks, messages, documents, librarian queries, and guidance lookups. When creating or updating Den tasks from this repo, tag them with `asha-testing` plus any lane/system tags.
+Use Den project ID `asha`; tag tasks with `asha-testing` and the relevant public
+surface.
 
-## Satellite repo boundary
+## Boundary
 
-This is a satellite repo. Do **not** jump into `/home/dev/asha-engine` and implement upstream engine changes as part of an `asha-testing` task, even when the task is blocked by a missing or broken ASHA surface.
+- Import approved package roots from `boundary-policy.json` only.
+- Do not import engine source paths, raw native/WASM transports, generated file
+  paths, or Rust authority internals.
+- A missing public capability becomes an upstream Den task, not a local tunnel.
+- Synthetic fixtures may use the documented reference backend. They never
+  become product authority or product acceptance.
 
-If the public ASHA surface cannot express the test or proof:
+## Test posture
 
-1. Stop the local implementation at the satellite boundary.
-2. Create a Den task in project `asha` for the upstream `asha-engine` change, tagged with `asha-engine` and `asha-testing`.
-3. Link the upstream task from the blocked `asha-testing` task/message.
-4. Mark the satellite task `blocked` with blocker summary, attempted remedies, and the upstream task ID.
-5. Wait for the upstream task to land before continuing. Do not tunnel through internals or carry a local engine patch in this repo.
+Keep a test only when it names a concrete public contract or failure mode.
+Prefer direct behavioral assertions over evidence catalogs, screenshots,
+source-token checks, or reports that certify other reports.
 
-## Allowed imports/calls
+Distinguish:
 
-See `boundary-policy.json` for the machine-readable list. Current intended public surfaces include:
+- **local guardrail**: import and repository-boundary policy;
+- **provider regression**: accepted/rejected commands, readbacks, call counts,
+  replay, and deterministic public outcomes;
+- **synthetic conformance**: an external fixture exercising a public surface;
+- **consumer acceptance**: visible Demo or Studio behavior, owned downstream.
 
-- `@asha/contracts`
-- `@asha/runtime-bridge`
-- `@asha/devtools`
-- `@asha/game-workspace`
-- approved ASHA CLI/tool commands documented by the current task
-- `@asha/renderer-three` only when a task explicitly marks it as an unstable demo/render-evidence surface and updates boundary policy accordingly
+Computed results belong under ignored `harness/out/` or in Den/CI evidence. Do
+not commit refresh-only result files.
 
-## Forbidden
+Optional prerequisites report `passed`, `failed`, `not_run`, `unavailable`, or
+`stale`. Only an executed, current result may be `passed`.
 
-- no imports from ASHA internal crate/package source paths;
-- no direct dependency on ASHA state/sim/services/rules/render/native/WASM internals;
-- no `@asha/native-bridge` imports;
-- no `@asha/wasm-replay-bridge` runtime imports;
-- no hand edits or local forks of generated contracts;
-- no raw JSON/runtime escape hatches;
-- no demo/product nouns added to ASHA core to make a prototype pass;
-- no upstream engine work performed directly from this satellite repo task.
-
-## Missing public surface workflow
-
-1. Try the current public surface first (`@asha/contracts`, `@asha/runtime-bridge`, `@asha/devtools`, `@asha/game-workspace`, or an approved ASHA CLI/tool command).
-2. If blocked, fill out `docs/engine-feature-request-template.md` and post/link it in the ASHA Den project. The request must explain the consumer use case, attempted public interface, missing capability, proposed engine surface, authority/projection/contract effects, required evidence, lane guess, and why the request is engine-level rather than demo/product-specific.
-3. Use `docs/temporary-adapter-template.md` only when a planner/steward explicitly approves a short-lived adapter. The adapter must link the engine feature request, include approval and expiry, live only in this consumer repo, carry evidence for why it was needed, and include review/removal steps.
-4. Missing public surface is never permission to import ASHA internals, raw native/WASM transports, generated file paths, or arbitrary JSON/runtime tunnels.
-
-## Local commands
+## Commands
 
 ```bash
-cd ../asha-engine/ts && pnpm install --frozen-lockfile
-cd ../../asha-testing && npm install
-npm run ci
+npm test
+npm run synthetic
+npm run synthetic:native
 ```
-
-For the conformance harness specifically:
-
-```bash
-npm run conformance
-```
-
-For the first-person camera mover boundary scenario:
-
-```bash
-npm run camera:mover
-```
-
-For game-workspace dev/debug/publish workflow evidence:
-
-```bash
-npm run dev:smoke
-npm run publish:evidence
-npm run verify:workflow
-```
-
-See `docs/game-workflow.md` for the manifest, Studio attach, devtools, publish, smoke, and evidence-manifest flow.
-
-The camera mover scenario writes `harness/out/camera-mover/latest/index.json`. Until ASHA has a public camera input/pose/projection surface, it must record the missing-surface engine feature request instead of importing internals or faking movement evidence.
-
-The harness writes `harness/out/conformance/latest/index.json` and must keep any missing public operation as an explicit artifact gap rather than using internals.

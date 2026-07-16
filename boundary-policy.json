@@ -26,5 +26,5 @@
       "ts/packages/contracts/src/generated"
     ]
   },
-  "remediation": "Use approved ASHA public package roots through their package exports. If the public facade cannot express the demo need, file an ASHA engine feature request or approved temporary adapter request instead of importing internals."
+  "remediation": "Use approved ASHA public package roots through their package exports. If a synthetic regression cannot use the public facade, file an ASHA engine feature request instead of importing internals. Product acceptance belongs in the product repository."
 }

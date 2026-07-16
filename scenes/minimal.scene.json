@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "sceneId": 1001,
-  "name": "ASHA Demo Minimal Cube",
-  "description": "Minimal game-workflow scene that loads through the public ASHA runtime path.",
-  "catalogAssetIds": ["mesh.demo-cube"],
-  "runtimeFixture": "harness/conformance/fixtures/minimal-world.json"
-}

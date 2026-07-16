@@ -1,4 +1,4 @@
-name: asha-testing boundary
+name: asha-testing public contracts
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  boundary:
+  public-contracts:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout asha-testing
@@ -29,6 +29,6 @@ jobs:
       - name: Install asha-testing dependencies
         working-directory: asha-testing
         run: npm ci
-      - name: Run conformance and boundary checks
+      - name: Run boundary and synthetic public-contract checks
         working-directory: asha-testing
-        run: npm run ci:boundary
+        run: npm test
