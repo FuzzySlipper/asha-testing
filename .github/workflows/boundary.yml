@@ -26,6 +26,9 @@ jobs:
       - name: Install ASHA TypeScript workspace dependencies
         working-directory: asha-engine/ts
         run: pnpm install --frozen-lockfile
+      - name: Build the public runtime bridge and its dependency closure
+        working-directory: asha-engine/ts
+        run: pnpm --filter @asha/runtime-bridge... run build
       - name: Install asha-testing dependencies
         working-directory: asha-testing
         run: npm ci
